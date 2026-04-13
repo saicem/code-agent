@@ -5,7 +5,7 @@
 
 import json
 import os
-from typing import List, Dict, Any
+
 
 
 class UserContextManager:
@@ -22,7 +22,7 @@ class UserContextManager:
         self.context_file = context_file
         self.context = self._load_context()
     
-    def _load_context(self) -> Dict[str, Any]:
+    def _load_context(self) -> dict[str, any]:
         """加载用户上下文
         
         Returns:
@@ -44,7 +44,7 @@ class UserContextManager:
         except Exception:
             pass
     
-    def update_from_dialogue(self, dialogue_history: List[Dict[str, str]]) -> None:
+    def update_from_dialogue(self, dialogue_history: list[dict[str, str]]) -> None:
         """从对话历史中更新用户上下文
         
         Args:
@@ -113,7 +113,7 @@ class UserContextManager:
         
         return "\n".join(summary_parts) if summary_parts else "暂无用户上下文信息"
     
-    def get_preferences(self) -> Dict[str, Any]:
+    def get_preferences(self) -> dict[str, any]:
         """获取用户偏好
         
         Returns:

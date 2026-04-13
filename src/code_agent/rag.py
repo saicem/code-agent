@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """
-基础 RAG 模块
+LlamaIndex RAG 模块（使用 ChromaDB 缓存）
 """
 
 import os
-import re
-from typing import List, Dict, Any, Optional
+import hashlib
+
 from code_agent.project_context import ProjectContextManager
+from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.vector_stores.chroma import ChromaVectorStore
+import chromadb
 
 
 class RAGManager:
-    """RAG 管理类"""
+    """RAG 管理类（使用 LlamaIndex 和 ChromaDB 实现）"""
     
     def __init__(self, project_context: ProjectContextManager):
         """初始化 RAG 管理器
@@ -19,8 +23,131 @@ class RAGManager:
             project_context: 项目上下文管理器
         """
         self.project_context = project_context
+        self.project_dir = project_context.project_dir
+        self.chroma_db_path = os.path.join(".memo", "chromadb")
+        
+        # 配置 LlamaIndex
+        self._configure_llama_index()
+        
+        # 构建或加载索引
+        self.index = self._build_or_load_index()
+        
+        # 创建检索器
+        if self.index:
+            self.retriever = self.index.as_retriever()
+        else:
+            self.retriever = None
     
-    def retrieve_relevant_files(self, query: str, limit: int = 3) -> List[Dict[str, Any]]:
+    def _configure_llama_index(self):
+        """配置 LlamaIndex"""
+        # 设置嵌入模型
+        Settings.embed_model = HuggingFaceEmbedding(
+            model_name="BAAI/bge-small-en-v1.5"
+        )
+    
+    def _calculate_directory_hash(self) -> str:
+        """计算项目目录的哈希值，用于检测文件变化
+        
+        Returns:
+            目录哈希值
+        """
+        # 复用项目上下文的目录哈希计算
+        return self.project_context.last_hash
+    
+    def _build_or_load_index(self):
+        """构建或加载索引
+        
+        Returns:
+            向量存储索引
+        """
+        try:
+            # 确保 .memo 目录存在
+            os.makedirs(".memo", exist_ok=True)
+            
+            # 计算当前目录哈希
+            current_hash = self._calculate_directory_hash()
+            
+            # 检查是否需要更新索引
+            index_hash_file = os.path.join(".memo", "rag_index_hash.txt")
+            need_update = True
+            
+            if os.path.exists(index_hash_file):
+                with open(index_hash_file, "r") as f:
+                    stored_hash = f.read().strip()
+                if stored_hash == current_hash:
+                    need_update = False
+            
+            if need_update:
+                print("检测到文件变化，重新构建 RAG 索引...")
+                # 构建新索引
+                index = self._build_index()
+                if index:
+                    # 保存当前哈希
+                    with open(index_hash_file, "w") as f:
+                        f.write(current_hash)
+                return index
+            else:
+                print("使用缓存的 RAG 索引...")
+                # 加载现有索引
+                return self._load_index()
+        except Exception as e:
+            print(f"构建或加载索引失败: {e}")
+            return None
+    
+    def _build_index(self):
+        """构建文档索引
+        
+        Returns:
+            向量存储索引
+        """
+        try:
+            # 读取项目目录中的文件
+            documents = SimpleDirectoryReader(
+                input_dir=str(self.project_dir),
+                recursive=True,
+                exclude=['.git', '.venv', '__pycache__', 'node_modules', '.vscode', '.idea', '.memo', 'test', '**/*.egg-info']
+            ).load_data()
+            
+            # 初始化 ChromaDB
+            chroma_client = chromadb.PersistentClient(path=self.chroma_db_path)
+            chroma_collection = chroma_client.get_or_create_collection("code_agent")
+            vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+            
+            # 构建索引
+            index = VectorStoreIndex.from_documents(
+                documents,
+                storage_context=storage_context
+            )
+            return index
+        except Exception as e:
+            print(f"构建索引失败: {e}")
+            return None
+    
+    def _load_index(self):
+        """加载现有索引
+        
+        Returns:
+            向量存储索引
+        """
+        try:
+            # 初始化 ChromaDB
+            chroma_client = chromadb.PersistentClient(path=self.chroma_db_path)
+            chroma_collection = chroma_client.get_or_create_collection("code_agent")
+            vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+            
+            # 加载索引
+            index = VectorStoreIndex.from_vector_store(
+                vector_store=vector_store,
+                storage_context=storage_context
+            )
+            return index
+        except Exception as e:
+            print(f"加载索引失败: {e}")
+            return None
+    
+    def retrieve_relevant_files(self, query: str, limit: int = 3) -> list[dict[str, any]]:
         """检索相关文件
         
         Args:
@@ -30,47 +157,35 @@ class RAGManager:
         Returns:
             相关文件列表
         """
-        # 从项目上下文中搜索文件
-        relevant_files = self.project_context.search_files(query, limit)
+        if not self.index:
+            return []
         
-        # 如果搜索结果不足，尝试从文件名中匹配
-        if len(relevant_files) < limit:
-            # 提取查询中的关键词
-            keywords = self._extract_keywords(query)
+        try:
+            # 使用 LlamaIndex 检索相关文档
+            nodes = self.retriever.retrieve(query, top_k=limit)
             
-            # 搜索包含关键词的文件
-            for keyword in keywords:
-                if len(relevant_files) >= limit:
-                    break
-                
-                keyword_files = self.project_context.search_files(keyword, limit - len(relevant_files))
-                for file_info in keyword_files:
-                    if file_info not in relevant_files:
+            # 处理检索结果
+            relevant_files = []
+            seen_files = set()
+            
+            for node in nodes:
+                file_path = node.metadata.get('file_path', '')
+                if file_path and file_path not in seen_files:
+                    seen_files.add(file_path)
+                    relative_path = os.path.relpath(file_path, self.project_dir)
+                    
+                    # 从项目上下文中获取文件信息
+                    if relative_path in self.project_context.file_index:
+                        file_info = self.project_context.file_index[relative_path]
                         relevant_files.append(file_info)
-        
-        return relevant_files[:limit]
-    
-    def _extract_keywords(self, query: str) -> List[str]:
-        """从查询中提取关键词
-        
-        Args:
-            query: 查询字符串
             
-        Returns:
-            关键词列表
-        """
-        # 移除常见的停用词
-        stop_words = {"的", "了", "是", "在", "有", "和", "与", "或", "但", "不", "这", "那", "我", "你", "他", "她", "它", "们", "个", "种", "类", "样", "样", "样"}
-        
-        # 使用正则表达式提取中文和英文单词
-        words = re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z]+', query)
-        
-        # 过滤停用词
-        keywords = [word for word in words if word not in stop_words and len(word) > 1]
-        
-        return keywords
+            return relevant_files[:limit]
+        except Exception as e:
+            print(f"检索文件失败: {e}")
+            # 回退到原始搜索方法
+            return self.project_context.search_files(query, limit)
     
-    def get_file_context(self, file_path: str, max_lines: int = 50) -> Optional[str]:
+    def get_file_context(self, file_path: str, max_lines: int = 50) -> str | None:
         """获取文件上下文
         
         Args:
@@ -80,20 +195,7 @@ class RAGManager:
         Returns:
             文件上下文字符串或 None
         """
-        content = self.project_context.get_file_content(file_path)
-        
-        if content is None:
-            return None
-        
-        # 按行分割
-        lines = content.split('\n')
-        
-        # 限制行数
-        if len(lines) > max_lines:
-            lines = lines[:max_lines]
-            lines.append("... (内容已截断)")
-        
-        return '\n'.join(lines)
+        return self.project_context.get_file_content(file_path)
     
     def build_retrieval_context(self, query: str) -> str:
         """构建检索上下文
@@ -104,8 +206,48 @@ class RAGManager:
         Returns:
             检索上下文字符串
         """
+        if not self.index:
+            # 回退到原始方法
+            return self._build_retrieval_context_fallback(query)
+        
+        try:
+            # 使用 LlamaIndex 检索相关文档
+            nodes = self.retriever.retrieve(query, top_k=3)
+            
+            if not nodes:
+                return "未找到相关文件"
+            
+            # 构建上下文
+            context_parts = ["相关文件内容:"]
+            
+            for i, node in enumerate(nodes, 1):
+                file_path = node.metadata.get('file_path', '')
+                if file_path:
+                    relative_path = os.path.relpath(file_path, self.project_dir)
+                    context_parts.append(f"\n{i}. {relative_path}")
+                    context_parts.append(f"```")
+                    context_parts.append(node.text[:2000])  # 限制文本长度
+                    if len(node.text) > 2000:
+                        context_parts.append("... (内容已截断)")
+                    context_parts.append(f"```")
+            
+            return '\n'.join(context_parts)
+        except Exception as e:
+            print(f"构建检索上下文失败: {e}")
+            # 回退到原始方法
+            return self._build_retrieval_context_fallback(query)
+    
+    def _build_retrieval_context_fallback(self, query: str) -> str:
+        """构建检索上下文的回退方法
+        
+        Args:
+            query: 查询字符串
+            
+        Returns:
+            检索上下文字符串
+        """
         # 检索相关文件
-        relevant_files = self.retrieve_relevant_files(query)
+        relevant_files = self.project_context.search_files(query, 3)
         
         if not relevant_files:
             return "未找到相关文件"
@@ -114,7 +256,7 @@ class RAGManager:
         context_parts = ["相关文件内容:"]
         
         for i, file_info in enumerate(relevant_files, 1):
-            relative_path = os.path.relpath(file_info["path"], self.project_context.project_dir)
+            relative_path = os.path.relpath(file_info["path"], self.project_dir)
             context_parts.append(f"\n{i}. {relative_path}")
             
             # 获取文件内容
@@ -128,7 +270,7 @@ class RAGManager:
         
         return '\n'.join(context_parts)
     
-    def search_code_snippets(self, query: str, file_types: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    def search_code_snippets(self, query: str, file_types: list[str] | None = None) -> list[dict[str, any]]:
         """搜索代码片段
         
         Args:
@@ -138,6 +280,7 @@ class RAGManager:
         Returns:
             代码片段列表
         """
+        # 回退到原始方法
         snippets = []
         
         # 获取所有文件
@@ -166,7 +309,7 @@ class RAGManager:
         
         return snippets
     
-    def _get_line_context(self, lines: List[str], line_num: int, context_lines: int = 2) -> List[str]:
+    def _get_line_context(self, lines: list[str], line_num: int, context_lines: int = 2) -> list[str]:
         """获取行上下文
         
         Args:

@@ -5,7 +5,6 @@
 
 import json
 import os
-from typing import List, Dict, Any, Optional
 
 
 class SessionContextManager:
@@ -25,7 +24,7 @@ class SessionContextManager:
         self.dialogue_history = self._load_history()
         self.compressed_summary = ""
     
-    def _load_history(self) -> List[Dict[str, str]]:
+    def _load_history(self) -> list[dict[str, str]]:
         """加载对话历史
         
         Returns:
@@ -158,7 +157,7 @@ class SessionContextManager:
         
         return "\n".join(context_parts)
     
-    def get_recent_dialogues(self, count: int = 5) -> List[Dict[str, str]]:
+    def get_recent_dialogues(self, count: int = 5) -> list[dict[str, str]]:
         """获取最近的对话
         
         Args:

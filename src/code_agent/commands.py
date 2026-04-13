@@ -3,7 +3,8 @@
 指令处理模块
 """
 
-from typing import Dict, Callable, Any
+
+from code_agent.context import global_context
 
 
 class CommandHandler:
@@ -19,8 +20,9 @@ class CommandHandler:
         self.register_command("/quit", self._handle_quit, "退出程序")
         self.register_command("/about", self._handle_about, "显示当前信息")
         self.register_command("/help", self._handle_help, "查看可用指令")
+        self.register_command("/rag", self._handle_rag, "测试 RAG 检索功能")
     
-    def register_command(self, command: str, handler: Callable, description: str):
+    def register_command(self, command: str, handler: callable, description: str):
         """注册新指令
         
         Args:
@@ -42,12 +44,11 @@ class CommandHandler:
         if command in self.commands:
             del self.commands[command]
     
-    def handle_command(self, command: str, **kwargs) -> bool:
+    def handle_command(self, command: str) -> bool:
         """处理指令
         
         Args:
             command: 指令字符串
-            **kwargs: 传递给处理函数的参数
             
         Returns:
             是否是指令并已处理
@@ -56,28 +57,32 @@ class CommandHandler:
         if not command.startswith("/"):
             return False
         
-        # 查找指令处理器
-        if command in self.commands:
-            handler_info = self.commands[command]
+        # 查找指令处理器（支持带参数的指令）
+        cmd_parts = command.split(' ', 1)
+        base_cmd = cmd_parts[0]
+        
+        if base_cmd in self.commands:
+            handler_info = self.commands[base_cmd]
             handler = handler_info["handler"]
             try:
-                handler(**kwargs)
+                # 调用处理函数
+                handler(command=command)
             except Exception as e:
                 print(f"执行指令出错: {e}")
             return True
         else:
-            print(f"未知指令: {command}")
+            print(f"未知指令: {base_cmd}")
             print("可用指令:")
-            for cmd, info in self.commands.items():
+            for cmd, info in sorted(self.commands.items()):
                 print(f"  {cmd}: {info['description']}")
             return True
     
-    def _handle_quit(self, **kwargs):
+    def _handle_quit(self, command: str):
         """处理 /quit 指令"""
         # 这里不需要做任何事情，因为主循环会捕获 'exit' 或 '/quit'
         pass
     
-    def _handle_help(self, **kwargs):
+    def _handle_help(self, command: str):
         """处理 /help 指令"""
         print("\n可用指令:")
         # 按字母序排列指令
@@ -85,9 +90,34 @@ class CommandHandler:
         for cmd, info in sorted_commands:
             print(f"  {cmd}: {info['description']}")
     
-    def _handle_about(self, **kwargs):
+    def _handle_rag(self, command: str):
+        """处理 /rag 指令"""
+        rag_manager = global_context.rag_manager
+        
+        if not rag_manager:
+            print("\n错误: RAG 管理器未初始化")
+            return
+        
+        # 提取命令后的文本内容
+        cmd_parts = command.split(' ', 1)
+        if len(cmd_parts) < 2:
+            print("\n用法: /rag <查询文本>")
+            return
+        
+        query = cmd_parts[1].strip()
+        
+        print(f"\n测试 RAG 检索: {query}")
+        print("=" * 60)
+        
+        # 构建检索上下文
+        context = rag_manager.build_retrieval_context(query)
+        
+        print(context)
+        print("=" * 60)
+    
+    def _handle_about(self, command: str):
         """处理 /about 指令"""
-        args = kwargs.get("args", None)
+        args = global_context.args
         if args:
             print("\nCode Agent 信息:")
             print(f"版本: 0.1.0")
@@ -98,7 +128,7 @@ class CommandHandler:
             if args.output:
                 print(f"输出文件: {args.output}")
     
-    def get_available_commands(self) -> Dict[str, str]:
+    def get_available_commands(self) -> dict[str, str]:
         """获取可用指令列表
         
         Returns:

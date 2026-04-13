@@ -6,7 +6,7 @@
 import os
 import hashlib
 import json
-from typing import List, Dict, Any, Optional
+
 from pathlib import Path
 
 
@@ -31,7 +31,7 @@ class ProjectContextManager:
         # 检查文件是否变化
         self._check_file_changes()
     
-    def _load_context(self) -> Dict[str, Any]:
+    def _load_context(self) -> dict[str, any]:
         """加载项目上下文
         
         Returns:
@@ -74,7 +74,7 @@ class ProjectContextManager:
         
         return hash_obj.hexdigest()
     
-    def _get_project_files(self) -> List[str]:
+    def _get_project_files(self) -> list[str]:
         """获取项目中的所有文件
         
         Returns:
@@ -190,7 +190,7 @@ class ProjectContextManager:
         
         return "\n".join(summary_parts)
     
-    def search_files(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+    def search_files(self, query: str, limit: int = 5) -> list[dict[str, any]]:
         """搜索文件
         
         Args:
@@ -218,7 +218,7 @@ class ProjectContextManager:
         
         return results
     
-    def get_file_content(self, file_path: str) -> Optional[str]:
+    def get_file_content(self, file_path: str) -> str | None:
         """获取文件内容
         
         Args:

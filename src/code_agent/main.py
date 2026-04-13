@@ -5,6 +5,18 @@ Code Agent 主入口文件
 
 import argparse
 import os
+import logging
+from code_agent.context import global_context
+
+# 尝试导入 readline 或 pyreadline3
+try:
+    import readline
+except ImportError:
+    try:
+        import pyreadline3 as readline
+    except ImportError:
+        # 如果两者都不可用，设置 readline 为 None
+        readline = None
 from code_agent.agent import CodeAgent
 from code_agent.user_context import UserContextManager
 from code_agent.project_context import ProjectContextManager
@@ -15,18 +27,25 @@ from code_agent.commands import CommandHandler
 
 def main():
     """主函数"""
+    # 设置历史命令文件
+    history_file = os.path.join(os.path.expanduser("~"), ".code_agent_history")
+    if readline:
+        try:
+            readline.read_history_file(history_file)
+            readline.set_history_length(1000)  # 限制历史记录长度
+        except FileNotFoundError:
+            pass  # 历史文件不存在，创建一个新的
+    
     # 解析命令行参数
     parser = argparse.ArgumentParser(description="Code Agent")
-    parser.add_argument("--platform", type=str, choices=["ollama", "bailian"], required=True,
-                        help="平台类型")
-    parser.add_argument("--model", type=str, required=True,
-                        help="模型名称")
+    parser.add_argument("--platform", type=str, choices=["ollama", "bailian"], required=True, help="平台类型")
+    parser.add_argument("--model", type=str, required=True, help="模型名称")
     parser.add_argument("--output", type=str, help="输出文件路径")
     parser.add_argument("--project-dir", type=str, default=".", help="项目目录路径")
     parser.add_argument("--apply-changes", action="store_true", help="应用代码修改到文件")
     args = parser.parse_args()
     
-    # 转化 project_dir 为绝对路径
+    # 确保项目目录是绝对路径
     args.project_dir = os.path.abspath(args.project_dir)
     
     # 初始化 Code Agent
@@ -43,6 +62,15 @@ def main():
     session_context = SessionContextManager()
     rag_manager = RAGManager(project_context)
     code_modifier = CodeModifier(args.project_dir)
+    
+    # 将组件存储到全局上下文
+    global_context.set_args(args)
+    global_context.set_rag_manager(rag_manager)
+    global_context.set_user_context(user_context)
+    global_context.set_project_context(project_context)
+    global_context.set_session_context(session_context)
+    global_context.set_agent(agent)
+    global_context.set_code_modifier(code_modifier)
     
     # 初始化指令处理器
     command_handler = CommandHandler()
@@ -66,8 +94,12 @@ def main():
     while True:
         task = input("\n任务: ")
         
+        # 保存到历史记录
+        if readline and task.strip():
+            readline.add_history(task)
+        
         # 处理指令
-        if command_handler.handle_command(task, args=args):
+        if command_handler.handle_command(task):
             if task == '/quit':
                 break
             continue
@@ -141,6 +173,11 @@ def main():
                 print(f"\n结果已写入到 {args.output}")
             except Exception as e:
                 print(f"写入文件失败: {e}")
+    
+    # 保存历史命令
+    if readline:
+        history_file = os.path.join(os.path.expanduser("~"), ".code_agent_history")
+        readline.write_history_file(history_file)
 
 def _build_enhanced_prompt(task, user_context, project_context, session_context, rag_manager):
     """构建增强的提示词

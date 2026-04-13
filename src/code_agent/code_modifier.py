@@ -5,7 +5,6 @@
 
 import os
 import re
-from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 
 
@@ -21,7 +20,7 @@ class CodeModifier:
         self.project_dir = Path(project_dir)
         self.changes_applied = []
     
-    def parse_code_blocks(self, response: str) -> List[Dict[str, Any]]:
+    def parse_code_blocks(self, response: str) -> list[dict[str, any]]:
         """解析响应中的代码块
         
         Args:
@@ -94,7 +93,7 @@ class CodeModifier:
         
         return code_blocks
     
-    def determine_target_files(self, code_blocks: List[Dict[str, Any]], task: str) -> List[Dict[str, Any]]:
+    def determine_target_files(self, code_blocks: list[dict[str, any]], task: str) -> list[dict[str, any]]:
         """确定目标文件
         
         Args:
@@ -130,7 +129,7 @@ class CodeModifier:
         
         return targets
     
-    def _extract_filename_from_task(self, task: str, code_block: Dict[str, Any]) -> Optional[str]:
+    def _extract_filename_from_task(self, task: str, code_block: dict[str, any]) -> str | None:
         """从任务描述中提取文件名
         
         Args:
@@ -224,7 +223,7 @@ class CodeModifier:
         else:
             return "create"
     
-    def apply_changes(self, targets: List[Dict[str, Any]], dry_run: bool = False) -> List[Dict[str, Any]]:
+    def apply_changes(self, targets: list[dict[str, any]], dry_run: bool = False) -> list[dict[str, any]]:
         """应用代码修改
         
         Args:

@@ -1,0 +1,20 @@
+[project]
+name = "code-agent"
+version = "0.1.0"
+description = "A simple code agent"
+authors = [
+    { name = "saicem", email = "saicem@qq.com" },
+]
+requires-python = ">=3.11"
+dependencies = [
+    "dashscope>=1.25.16",
+    "requests>=2.31.0",
+]
+
+[tool.setuptools]
+packages = ["code_agent"]
+package-dir = { ""= "src" }
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"

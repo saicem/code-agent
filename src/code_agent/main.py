@@ -11,6 +11,7 @@ from code_agent.project_context import ProjectContextManager
 from code_agent.session_context import SessionContextManager
 from code_agent.rag import RAGManager
 from code_agent.code_modifier import CodeModifier
+from code_agent.commands import CommandHandler
 
 def main():
     """主函数"""
@@ -24,6 +25,9 @@ def main():
     parser.add_argument("--project-dir", type=str, default=".", help="项目目录路径")
     parser.add_argument("--apply-changes", action="store_true", help="应用代码修改到文件")
     args = parser.parse_args()
+    
+    # 转化 project_dir 为绝对路径
+    args.project_dir = os.path.abspath(args.project_dir)
     
     # 初始化 Code Agent
     try:
@@ -40,6 +44,9 @@ def main():
     rag_manager = RAGManager(project_context)
     code_modifier = CodeModifier(args.project_dir)
     
+    # 初始化指令处理器
+    command_handler = CommandHandler()
+    
     # 显示项目信息
     print("\n" + "="*50)
     print("项目上下文:")
@@ -53,13 +60,17 @@ def main():
         print(user_summary)
         print()
     
-    print("请输入任务描述，输入 'exit' 退出")
+    print("请输入任务描述，输入 '/quit' 退出，输入 '/help' 查看可用指令")
     
     # 循环对话
     while True:
         task = input("\n任务: ")
-        if task.lower() == 'exit':
-            break
+        
+        # 处理指令
+        if command_handler.handle_command(task, args=args):
+            if task == '/quit':
+                break
+            continue
         
         # 构建增强的提示词
         enhanced_prompt = _build_enhanced_prompt(

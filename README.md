@@ -132,8 +132,7 @@ python src/code_agent/main.py --platform bailian --model qwen3.5-max --output ou
 
 ```
 code-agent/
-├── .memo/               # 存储记忆和上下文数据
-│   ├── memory.json       # 记忆数据
+├── .memo/               # 存储上下文数据
 │   ├── user_context.json # 用户上下文数据
 │   ├── project_context.json # 项目上下文数据
 │   └── session_context.json # 会话上下文数据
@@ -145,7 +144,6 @@ code-agent/
 │       ├── code_modifier.py # 代码修改应用模块
 │       ├── error_handling.py # 错误处理模块
 │       ├── main.py       # 主入口文件
-│       ├── memory.py     # 记忆管理模块
 │       ├── project_context.py # 项目上下文管理模块
 │       ├── rag.py        # RAG 检索模块
 │       ├── security.py   # 安全管理模块
@@ -166,6 +164,39 @@ code-agent/
 - **应用修改**：通过命令行参数 `--apply-changes` 启用
 - **存储目录**：所有记忆和上下文数据存储在 `.memo` 文件夹中
 - **测试文件**：所有测试文件放在 `test` 文件夹中
+
+## 命令行指令
+
+在交互式会话中，您可以使用以下指令：
+
+- **输入任务描述**：直接输入您的任务或代码修改请求
+- **/quit**：退出程序
+- **/about**：显示当前 Code Agent 的版本、平台、模型等信息
+- **/help**：查看可用指令（按字母序排列）
+
+## 扩展指令系统
+
+Code Agent 支持动态扩展指令系统，您可以通过以下方式添加自定义指令：
+
+1. 在 `commands.py` 文件中注册新指令：
+
+```python
+from code_agent.commands import CommandHandler
+
+# 创建指令处理器实例
+command_handler = CommandHandler()
+
+# 定义自定义指令处理函数
+def custom_command_handler(**kwargs):
+    print("这是一个自定义指令")
+
+# 注册新指令
+command_handler.register_command("/custom", custom_command_handler, "自定义指令示例")
+```
+
+2. 指令处理函数可以接收任意关键字参数，这些参数会从调用处传递过来
+
+3. 注册指令后，它会自动出现在 `/about` 指令的输出中，并可以在交互式会话中使用
 
 ## 注意事项
 

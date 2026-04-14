@@ -6,6 +6,43 @@
 import os
 import re
 from pathlib import Path
+from dataclasses import dataclass
+
+
+@dataclass
+class CodeBlock:
+    """代码块数据类"""
+    language: str
+    code: str
+    type: str
+
+
+@dataclass
+class TargetFile:
+    """目标文件数据类"""
+    file_name: str
+    code: str
+    language: str
+    operation: str
+    is_temp: bool = False
+
+
+@dataclass
+class ApplyResult:
+    """应用结果数据类"""
+    file_name: str
+    operation: str
+    success: bool
+    message: str
+    is_temp: bool = False
+
+
+@dataclass
+class ChangeRecord:
+    """修改记录数据类"""
+    file: str
+    operation: str
+    is_temp: bool = False
 
 
 class CodeModifier:
@@ -20,7 +57,7 @@ class CodeModifier:
         self.project_dir = Path(project_dir)
         self.changes_applied = []
     
-    def parse_code_blocks(self, response: str) -> list[dict[str, any]]:
+    def parse_code_blocks(self, response: str) -> list[CodeBlock]:
         """解析响应中的代码块
         
         Args:
@@ -36,14 +73,14 @@ class CodeModifier:
         matches = re.finditer(pattern, response, re.DOTALL)
         
         for match in matches:
-            language = match.group(1) or "text"
-            code = match.group(2).strip()
+            language: str = match.group(1) or "text"
+            code: str = match.group(2).strip()
             
-            code_blocks.append({
-                "language": language,
-                "code": code,
-                "type": "code_block"
-            })
+            code_blocks.append(CodeBlock(
+                language=language,
+                code=code,
+                type="code_block"
+            ))
         
         # 如果没有找到代码块，尝试匹配其他格式
         if not code_blocks:
@@ -59,11 +96,11 @@ class CodeModifier:
                 # 检测代码开始
                 if stripped.startswith(('def ', 'class ', 'import ', 'from ', 'async def ')):
                     if current_code:
-                        code_blocks.append({
-                            "language": "python",
-                            "code": '\n'.join(current_code),
-                            "type": "indented_code"
-                        })
+                        code_blocks.append(CodeBlock(
+                            language="python",
+                            code='\n'.join(current_code),
+                            type="indented_code"
+                        ))
                         current_code = []
                     in_code = True
                     indent_level = len(line) - len(line.lstrip())
@@ -71,11 +108,11 @@ class CodeModifier:
                 # 检测代码结束
                 elif in_code and stripped and not line.startswith(' ' * (indent_level or 0)):
                     if current_code:
-                        code_blocks.append({
-                            "language": "python",
-                            "code": '\n'.join(current_code),
-                            "type": "indented_code"
-                        })
+                        code_blocks.append(CodeBlock(
+                            language="python",
+                            code='\n'.join(current_code),
+                            type="indented_code"
+                        ))
                         current_code = []
                     in_code = False
                 
@@ -85,15 +122,15 @@ class CodeModifier:
             
             # 添加最后的代码块
             if current_code:
-                code_blocks.append({
-                    "language": "python",
-                    "code": '\n'.join(current_code),
-                    "type": "indented_code"
-                })
+                code_blocks.append(CodeBlock(
+                    language="python",
+                    code='\n'.join(current_code),
+                    type="indented_code"
+                ))
         
         return code_blocks
     
-    def determine_target_files(self, code_blocks: list[dict[str, any]], task: str) -> list[dict[str, any]]:
+    def determine_target_files(self, code_blocks: list[CodeBlock], task: str) -> list[TargetFile]:
         """确定目标文件
         
         Args:
@@ -110,26 +147,26 @@ class CodeModifier:
             file_name = self._extract_filename_from_task(task, code_block)
             
             if file_name:
-                targets.append({
-                    "file_name": file_name,
-                    "code": code_block["code"],
-                    "language": code_block["language"],
-                    "operation": self._determine_operation(task)
-                })
+                targets.append(TargetFile(
+                    file_name=file_name,
+                    code=code_block.code,
+                    language=code_block.language,
+                    operation=self._determine_operation(task)
+                ))
             else:
                 # 如果没有明确的文件名，创建临时文件
-                temp_name = self._generate_temp_filename(code_block["language"])
-                targets.append({
-                    "file_name": temp_name,
-                    "code": code_block["code"],
-                    "language": code_block["language"],
-                    "operation": self._determine_operation(task),
-                    "is_temp": True
-                })
+                temp_name = self._generate_temp_filename(code_block.language)
+                targets.append(TargetFile(
+                    file_name=temp_name,
+                    code=code_block.code,
+                    language=code_block.language,
+                    operation=self._determine_operation(task),
+                    is_temp=True
+                ))
         
         return targets
     
-    def _extract_filename_from_task(self, task: str, code_block: dict[str, any]) -> str | None:
+    def _extract_filename_from_task(self, task: str, code_block: CodeBlock) -> str | None:
         """从任务描述中提取文件名
         
         Args:
@@ -154,7 +191,7 @@ class CodeModifier:
         if matches:
             # 根据代码块语言添加扩展名
             filename = matches[0]
-            ext = self._get_extension_from_language(code_block["language"])
+            ext = self._get_extension_from_language(code_block.language)
             return f"{filename}{ext}"
         
         return None
@@ -223,7 +260,7 @@ class CodeModifier:
         else:
             return "create"
     
-    def apply_changes(self, targets: list[dict[str, any]], dry_run: bool = False) -> list[dict[str, any]]:
+    def apply_changes(self, targets: list[TargetFile], dry_run: bool = False) -> list[ApplyResult]:
         """应用代码修改
         
         Args:
@@ -236,18 +273,18 @@ class CodeModifier:
         results = []
         
         for target in targets:
-            file_name = target["file_name"]
-            code = target["code"]
-            operation = target["operation"]
-            is_temp = target.get("is_temp", False)
+            file_name = target.file_name
+            code = target.code
+            operation = target.operation
+            is_temp = target.is_temp
             
-            result = {
-                "file_name": file_name,
-                "operation": operation,
-                "success": False,
-                "message": "",
-                "is_temp": is_temp
-            }
+            result = ApplyResult(
+                file_name=file_name,
+                operation=operation,
+                success=False,
+                message="",
+                is_temp=is_temp
+            )
             
             try:
                 file_path = self.project_dir / file_name
@@ -257,8 +294,8 @@ class CodeModifier:
                     if not dry_run:
                         with open(file_path, "w", encoding="utf-8") as f:
                             f.write(code)
-                    result["success"] = True
-                    result["message"] = f"已创建文件: {file_name}"
+                    result.success = True
+                    result.message = f"已创建文件: {file_name}"
                 
                 elif operation == "update":
                     # 更新现有文件
@@ -266,10 +303,10 @@ class CodeModifier:
                         if not dry_run:
                             with open(file_path, "w", encoding="utf-8") as f:
                                 f.write(code)
-                        result["success"] = True
-                        result["message"] = f"已更新文件: {file_name}"
+                        result.success = True
+                        result.message = f"已更新文件: {file_name}"
                     else:
-                        result["message"] = f"文件不存在: {file_name}"
+                        result.message = f"文件不存在: {file_name}"
                 
                 elif operation == "append":
                     # 追加到文件
@@ -277,33 +314,33 @@ class CodeModifier:
                         if not dry_run:
                             with open(file_path, "a", encoding="utf-8") as f:
                                 f.write("\n" + code)
-                        result["success"] = True
-                        result["message"] = f"已追加到文件: {file_name}"
+                        result.success = True
+                        result.message = f"已追加到文件: {file_name}"
                     else:
-                        result["message"] = f"文件不存在: {file_name}"
+                        result.message = f"文件不存在: {file_name}"
                 
                 elif operation == "delete":
                     # 删除文件
                     if file_path.exists():
                         if not dry_run:
                             os.remove(file_path)
-                        result["success"] = True
-                        result["message"] = f"已删除文件: {file_name}"
+                        result.success = True
+                        result.message = f"已删除文件: {file_name}"
                     else:
-                        result["message"] = f"文件不存在: {file_name}"
+                        result.message = f"文件不存在: {file_name}"
                 
                 else:
-                    result["message"] = f"不支持的操作: {operation}"
+                    result.message = f"不支持的操作: {operation}"
                 
-                if result["success"]:
-                    self.changes_applied.append({
-                        "file": file_name,
-                        "operation": operation,
-                        "is_temp": is_temp
-                    })
+                if result.success:
+                    self.changes_applied.append(ChangeRecord(
+                        file=file_name,
+                        operation=operation,
+                        is_temp=is_temp
+                    ))
             
             except Exception as e:
-                result["message"] = f"操作失败: {str(e)}"
+                result.message = f"操作失败: {str(e)}"
             
             results.append(result)
         
@@ -321,9 +358,9 @@ class CodeModifier:
         summary_parts = ["已应用的修改:"]
         
         for change in self.changes_applied:
-            file_name = change["file"]
-            operation = change["operation"]
-            is_temp = change.get("is_temp", False)
+            file_name = change.file
+            operation = change.operation
+            is_temp = change.is_temp
             
             operation_text = {
                 "create": "创建",

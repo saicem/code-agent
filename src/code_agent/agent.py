@@ -5,12 +5,13 @@ Code Agent 工厂类
 
 from code_agent.agents.ollama_agent import OllamaAgent
 from code_agent.agents.bailian_agent import BailianAgent
+from code_agent.agents.base_agent import BaseAgent
 
 class CodeAgent:
     """Code Agent 工厂类"""
     
     @staticmethod
-    def create(platform, model):
+    def create(platform, model) -> BaseAgent:
         """创建 Code Agent 实例
         
         Args:

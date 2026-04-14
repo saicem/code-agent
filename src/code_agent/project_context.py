@@ -6,52 +6,94 @@
 import os
 import hashlib
 import json
-
+from dataclasses import dataclass
 from pathlib import Path
+from code_agent.config import config
+
+
+@dataclass
+class FileInfo:
+    """文件信息数据类"""
+    path: str
+    size: int
+    modified: float
+    extension: str
+    preview: str
+
+
+@dataclass
+class ProjectContext:
+    """项目上下文数据类"""
+    file_index: dict[str, FileInfo]
+    last_hash: str
 
 
 class ProjectContextManager:
     """项目上下文管理类"""
     
-    def __init__(self, project_dir: str = ".", context_file: str = ".memo/project_context.json"):
+    def __init__(self, project_dir: str = "."):
         """初始化项目上下文管理器
         
         Args:
             project_dir: 项目目录路径
-            context_file: 上下文文件路径
         """
-        # 确保 .memo 目录存在
-        os.makedirs(".memo", exist_ok=True)
         self.project_dir = Path(project_dir)
-        self.context_file = context_file
+        self.context_file = config.project_context_file
         self.context = self._load_context()
-        self.file_index = self.context.get("file_index", {})
-        self.last_hash = self.context.get("last_hash", "")
         
         # 检查文件是否变化
         self._check_file_changes()
     
-    def _load_context(self) -> dict[str, any]:
+    def _load_context(self) -> ProjectContext:
         """加载项目上下文
         
         Returns:
-            项目上下文字典
+            项目上下文对象
         """
         if os.path.exists(self.context_file):
             try:
                 with open(self.context_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    # 转换 file_index 为 FileInfo 对象
+                    file_index = {}
+                    for path, info in data.get("file_index", {}).items():
+                        file_index[path] = FileInfo(
+                            path=info.get("path", ""),
+                            size=info.get("size", 0),
+                            modified=info.get("modified", 0.0),
+                            extension=info.get("extension", ""),
+                            preview=info.get("preview", "")
+                        )
+                    return ProjectContext(
+                        file_index=file_index,
+                        last_hash=data.get("last_hash", "")
+                    )
             except Exception:
-                return {}
-        return {}
+                pass
+        return ProjectContext(file_index={}, last_hash="")
     
     def _save_context(self) -> None:
         """保存项目上下文"""
-        self.context["file_index"] = self.file_index
-        self.context["last_hash"] = self.last_hash
+        # 转换 FileInfo 对象为字典
+        file_index_dict = {}
+        for path, info in self.context.file_index.items():
+            file_index_dict[path] = {
+                "path": info.path,
+                "size": info.size,
+                "modified": info.modified,
+                "extension": info.extension,
+                "preview": info.preview
+            }
+        
+        # 构建保存的数据
+        data = {
+            "file_index": file_index_dict,
+            "last_hash": self.context.last_hash
+        }
+        
         try:
             with open(self.context_file, "w", encoding="utf-8") as f:
-                json.dump(self.context, f, ensure_ascii=False, indent=2)
+                json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception:
             pass
     
@@ -105,8 +147,8 @@ class ProjectContextManager:
         """
         current_hash = self._calculate_directory_hash()
         
-        if current_hash != self.last_hash:
-            self.last_hash = current_hash
+        if current_hash != self.context.last_hash:
+            self.context.last_hash = current_hash
             self._rebuild_file_index()
             self._save_context()
             return True
@@ -115,7 +157,7 @@ class ProjectContextManager:
     def _rebuild_file_index(self) -> None:
         """重建文件索引"""
         files = self._get_project_files()
-        self.file_index = {}
+        self.context.file_index = {}
         
         for file_path in files:
             try:
@@ -133,13 +175,13 @@ class ProjectContextManager:
                 except Exception:
                     pass
                 
-                self.file_index[relative_path] = {
-                    "path": file_path,
-                    "size": file_stat.st_size,
-                    "modified": file_stat.st_mtime,
-                    "extension": file_ext,
-                    "preview": content_preview
-                }
+                self.context.file_index[relative_path] = FileInfo(
+                    path=file_path,
+                    size=file_stat.st_size,
+                    modified=file_stat.st_mtime,
+                    extension=file_ext,
+                    preview=content_preview
+                )
             except Exception:
                 continue
     
@@ -149,30 +191,35 @@ class ProjectContextManager:
         Returns:
             项目摘要字符串
         """
-        if not self.file_index:
+        if not self.context.file_index:
             return "项目为空或未找到文件"
         
         # 统计文件类型
         file_types = {}
-        for file_info in self.file_index.values():
-            ext = file_info["extension"]
+        for file_info in self.context.file_index.values():
+            ext = file_info.extension
             file_types[ext] = file_types.get(ext, 0) + 1
         
         # 获取主要文件类型
         if file_types:
-            main_type = max(file_types, key=file_types.get)
-            type_count = file_types[main_type]
+            # 使用循环找到出现次数最多的文件类型
+            main_type = ""
+            type_count = 0
+            for ext, count in file_types.items():
+                if count > type_count:
+                    main_type = ext
+                    type_count = count
         else:
             main_type = "无"
             type_count = 0
         
         # 统计总文件数
-        total_files = len(self.file_index)
+        total_files = len(self.context.file_index)
         
         # 获取最近修改的文件
         sorted_files = sorted(
-            self.file_index.values(),
-            key=lambda x: x["modified"],
+            self.context.file_index.values(),
+            key=lambda x: x.modified,
             reverse=True
         )
         recent_files = sorted_files[:5]
@@ -185,12 +232,12 @@ class ProjectContextManager:
         ]
         
         for file_info in recent_files:
-            relative_path = os.path.relpath(file_info["path"], self.project_dir)
+            relative_path = os.path.relpath(file_info.path, self.project_dir)
             summary_parts.append(f"  - {relative_path}")
         
         return "\n".join(summary_parts)
     
-    def search_files(self, query: str, limit: int = 5) -> list[dict[str, any]]:
+    def search_files(self, query: str, limit: int = 5) -> list[FileInfo]:
         """搜索文件
         
         Args:
@@ -203,7 +250,7 @@ class ProjectContextManager:
         query_lower = query.lower()
         results = []
         
-        for relative_path, file_info in self.file_index.items():
+        for relative_path, file_info in self.context.file_index.items():
             # 在文件名中搜索
             if query_lower in relative_path.lower():
                 results.append(file_info)
@@ -211,7 +258,7 @@ class ProjectContextManager:
                     break
             
             # 在文件内容预览中搜索
-            elif query_lower in file_info.get("preview", "").lower():
+            elif query_lower in file_info.preview.lower():
                 results.append(file_info)
                 if len(results) >= limit:
                     break
@@ -233,7 +280,7 @@ class ProjectContextManager:
         
         # 检查文件是否在索引中
         relative_path = os.path.relpath(file_path, self.project_dir)
-        if relative_path not in self.file_index:
+        if relative_path not in self.context.file_index:
             return None
         
         try:
@@ -244,7 +291,5 @@ class ProjectContextManager:
     
     def clear_context(self) -> None:
         """清空项目上下文"""
-        self.context = {}
-        self.file_index = {}
-        self.last_hash = ""
+        self.context = ProjectContext(file_index={}, last_hash="")
         self._save_context()

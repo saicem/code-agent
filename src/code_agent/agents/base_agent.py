@@ -19,7 +19,7 @@ class BaseAgent:
         self.error_handler = ErrorHandler()
         self.security_manager = SecurityManager()
     
-    def execute_task(self, task):
+    def execute_task(self, task: str) -> str:
         """执行任务
         
         Args:

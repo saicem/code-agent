@@ -4,9 +4,10 @@ LlamaIndex RAG 模块（使用 ChromaDB 缓存）
 """
 
 import os
-import hashlib
 
 from code_agent.project_context import ProjectContextManager
+from code_agent.config import config
+from typing import Any
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, Settings, StorageContext
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
@@ -24,7 +25,7 @@ class RAGManager:
         """
         self.project_context = project_context
         self.project_dir = project_context.project_dir
-        self.chroma_db_path = os.path.join(".memo", "chromadb")
+        self.chroma_db_path = config.rag_chroma_db_path
         
         # 配置 LlamaIndex
         self._configure_llama_index()
@@ -34,7 +35,7 @@ class RAGManager:
         
         # 创建检索器
         if self.index:
-            self.retriever = self.index.as_retriever()
+            self.retriever = self.index.as_retriever(similarity_top_k=config.rag_similarity_top_k)
         else:
             self.retriever = None
     
@@ -52,7 +53,7 @@ class RAGManager:
             目录哈希值
         """
         # 复用项目上下文的目录哈希计算
-        return self.project_context.last_hash
+        return self.project_context.context.last_hash
     
     def _build_or_load_index(self):
         """构建或加载索引
@@ -147,7 +148,7 @@ class RAGManager:
             print(f"加载索引失败: {e}")
             return None
     
-    def retrieve_relevant_files(self, query: str, limit: int = 3) -> list[dict[str, any]]:
+    def retrieve_relevant_files(self, query: str, limit: int = 3) -> list[dict[str, Any]]:
         """检索相关文件
         
         Args:
@@ -162,7 +163,22 @@ class RAGManager:
         
         try:
             # 使用 LlamaIndex 检索相关文档
-            nodes = self.retriever.retrieve(query, top_k=limit)
+            if self.retriever:
+                nodes = self.retriever.retrieve(query, top_k=limit)
+            else:
+                # 回退到原始搜索方法
+                file_infos = self.project_context.search_files(query, limit)
+                # 转换 FileInfo 对象为字典
+                return [
+                    {
+                        "path": info.path,
+                        "size": info.size,
+                        "modified": info.modified,
+                        "extension": info.extension,
+                        "preview": info.preview
+                    }
+                    for info in file_infos
+                ]
             
             # 处理检索结果
             relevant_files = []
@@ -175,15 +191,32 @@ class RAGManager:
                     relative_path = os.path.relpath(file_path, self.project_dir)
                     
                     # 从项目上下文中获取文件信息
-                    if relative_path in self.project_context.file_index:
-                        file_info = self.project_context.file_index[relative_path]
-                        relevant_files.append(file_info)
+                    if relative_path in self.project_context.context.file_index:
+                        file_info = self.project_context.context.file_index[relative_path]
+                        relevant_files.append({
+                            "path": file_info.path,
+                            "size": file_info.size,
+                            "modified": file_info.modified,
+                            "extension": file_info.extension,
+                            "preview": file_info.preview
+                        })
             
             return relevant_files[:limit]
         except Exception as e:
             print(f"检索文件失败: {e}")
             # 回退到原始搜索方法
-            return self.project_context.search_files(query, limit)
+            file_infos = self.project_context.search_files(query, limit)
+            # 转换 FileInfo 对象为字典
+            return [
+                {
+                    "path": info.path,
+                    "size": info.size,
+                    "modified": info.modified,
+                    "extension": info.extension,
+                    "preview": info.preview
+                }
+                for info in file_infos
+            ]
     
     def get_file_context(self, file_path: str, max_lines: int = 50) -> str | None:
         """获取文件上下文
@@ -212,7 +245,11 @@ class RAGManager:
         
         try:
             # 使用 LlamaIndex 检索相关文档
-            nodes = self.retriever.retrieve(query, top_k=3)
+            if self.retriever:
+                nodes = self.retriever.retrieve(query, top_k=3)
+            else:
+                # 回退到原始方法
+                return self._build_retrieval_context_fallback(query)
             
             if not nodes:
                 return "未找到相关文件"
@@ -225,11 +262,11 @@ class RAGManager:
                 if file_path:
                     relative_path = os.path.relpath(file_path, self.project_dir)
                     context_parts.append(f"\n{i}. {relative_path}")
-                    context_parts.append(f"```")
+                    context_parts.append("```")
                     context_parts.append(node.text[:2000])  # 限制文本长度
                     if len(node.text) > 2000:
                         context_parts.append("... (内容已截断)")
-                    context_parts.append(f"```")
+                    context_parts.append("```")
             
             return '\n'.join(context_parts)
         except Exception as e:
@@ -256,21 +293,21 @@ class RAGManager:
         context_parts = ["相关文件内容:"]
         
         for i, file_info in enumerate(relevant_files, 1):
-            relative_path = os.path.relpath(file_info["path"], self.project_dir)
+            relative_path = os.path.relpath(file_info.path, self.project_dir)
             context_parts.append(f"\n{i}. {relative_path}")
             
             # 获取文件内容
             file_content = self.get_file_context(relative_path)
             if file_content:
-                context_parts.append(f"```")
+                context_parts.append("```")
                 context_parts.append(file_content)
-                context_parts.append(f"```")
+                context_parts.append("```")
             else:
                 context_parts.append("无法读取文件内容")
         
         return '\n'.join(context_parts)
     
-    def search_code_snippets(self, query: str, file_types: list[str] | None = None) -> list[dict[str, any]]:
+    def search_code_snippets(self, query: str, file_types: list[str] | None = None) -> list[dict[str, Any]]:
         """搜索代码片段
         
         Args:
@@ -284,10 +321,10 @@ class RAGManager:
         snippets = []
         
         # 获取所有文件
-        for relative_path, file_info in self.project_context.file_index.items():
+        for relative_path, file_info in self.project_context.context.file_index.items():
             # 过滤文件类型
             if file_types:
-                ext = file_info["extension"]
+                ext = file_info.extension
                 if ext not in file_types:
                     continue
             

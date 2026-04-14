@@ -5,24 +5,19 @@
 
 import json
 import os
-
+from typing import Any
+from code_agent.config import config
 
 
 class UserContextManager:
     """用户上下文管理类"""
     
-    def __init__(self, context_file=".memo/user_context.json"):
-        """初始化用户上下文管理器
-        
-        Args:
-            context_file: 上下文文件路径
-        """
-        # 确保 .memo 目录存在
-        os.makedirs(".memo", exist_ok=True)
-        self.context_file = context_file
+    def __init__(self):
+        """初始化用户上下文管理器"""
+        self.context_file = config.user_context_file
         self.context = self._load_context()
     
-    def _load_context(self) -> dict[str, any]:
+    def _load_context(self) -> dict[str, Any]:
         """加载用户上下文
         
         Returns:
@@ -113,7 +108,7 @@ class UserContextManager:
         
         return "\n".join(summary_parts) if summary_parts else "暂无用户上下文信息"
     
-    def get_preferences(self) -> dict[str, any]:
+    def get_preferences(self) -> dict[str, Any]:
         """获取用户偏好
         
         Returns:

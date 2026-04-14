@@ -16,7 +16,7 @@ except Exception as e:
 # 测试初始化
 print("\n测试初始化...")
 try:
-    agent = CodeAgent(platform='ollama', model='Qwen3.5')
+    agent = CodeAgent.create(platform='ollama', model='Qwen3.5')
     print("初始化成功")
 except Exception as e:
     print(f"初始化失败: {e}")

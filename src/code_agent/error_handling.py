@@ -3,6 +3,7 @@
 错误处理模块
 """
 
+import os
 import traceback
 import logging
 import requests
@@ -61,3 +62,25 @@ class ErrorHandler:
             return False, "输入长度不能超过 1000 字符"
         
         return True, ""
+
+
+def get_env_var(var_name: str, error_message: str) -> str:
+    """从环境变量获取值，如果获取不到则报错
+    
+    Args:
+        var_name: 环境变量名称
+        error_message: 自定义错误消息
+        
+    Returns:
+        环境变量的值
+        
+    Raises:
+        ValueError: 环境变量未设置时
+    """
+    value = os.getenv(var_name)
+    if not value:
+        if error_message:
+            raise ValueError(error_message)
+        else:
+            raise ValueError(f"环境变量 {var_name} 未设置")
+    return value

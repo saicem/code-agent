@@ -4,13 +4,15 @@ LlamaIndex RAG 模块（使用 ChromaDB 缓存）
 """
 
 import os
+import hashlib
+import json
 
-from code_agent.project_context import ProjectContextManager
+from code_agent.contexts import ProjectContextManager
 from code_agent.config import config
+from code_agent.file_ignore import FileIgnoreManager
 from typing import Any
 from llama_index.core import (
     VectorStoreIndex,
-    SimpleDirectoryReader,
     Settings,
     StorageContext,
 )
@@ -32,6 +34,9 @@ class RAGManager:
         self.project_dir = project_context.project_dir
         self.chroma_db_path = config.rag_chroma_db_path
 
+        # 初始化文件忽略管理器
+        self.ignore_manager = FileIgnoreManager(str(self.project_dir))
+
         # 配置 LlamaIndex
         self._configure_llama_index()
 
@@ -51,15 +56,6 @@ class RAGManager:
         # 设置嵌入模型
         Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
-    def _calculate_directory_hash(self) -> str:
-        """计算项目目录的哈希值，用于检测文件变化
-
-        Returns:
-            目录哈希值
-        """
-        # 复用项目上下文的目录哈希计算
-        return self.project_context.context.last_hash
-
     def _build_or_load_index(self):
         """构建或加载索引
 
@@ -70,27 +66,23 @@ class RAGManager:
             # 确保 .memo 目录存在
             os.makedirs(".memo", exist_ok=True)
 
-            # 计算当前目录哈希
-            current_hash = self._calculate_directory_hash()
+            # 加载文件哈希记录
+            file_hash_file = os.path.join(".memo", "rag_file_hashes.json")
+            file_hashes = self._load_file_hashes(file_hash_file)
 
-            # 检查是否需要更新索引
-            index_hash_file = os.path.join(".memo", "rag_index_hash.txt")
-            need_update = True
+            # 获取当前项目中的所有文件及其哈希
+            current_files = self._get_project_files_with_hashes()
 
-            if os.path.exists(index_hash_file):
-                with open(index_hash_file, "r") as f:
-                    stored_hash = f.read().strip()
-                if stored_hash == current_hash:
-                    need_update = False
+            # 检查是否有文件变化
+            changed_files = self._get_changed_files(file_hashes, current_files)
 
-            if need_update:
-                print("检测到文件变化，重新构建 RAG 索引...")
-                # 构建新索引
-                index = self._build_index()
+            if changed_files:
+                print(f"检测到 {len(changed_files)} 个文件变化，更新 RAG 索引...")
+                # 增量更新索引
+                index = self._update_index(changed_files, file_hashes, current_files)
                 if index:
-                    # 保存当前哈希
-                    with open(index_hash_file, "w") as f:
-                        f.write(current_hash)
+                    # 保存文件哈希记录
+                    self._save_file_hashes(file_hash_file, current_files)
                 return index
             else:
                 print("使用缓存的 RAG 索引...")
@@ -98,45 +90,6 @@ class RAGManager:
                 return self._load_index()
         except Exception as e:
             print(f"构建或加载索引失败: {e}")
-            return None
-
-    def _build_index(self):
-        """构建文档索引
-
-        Returns:
-            向量存储索引
-        """
-        try:
-            # 读取项目目录中的文件
-            documents = SimpleDirectoryReader(
-                input_dir=str(self.project_dir),
-                recursive=True,
-                exclude=[
-                    ".git",
-                    ".venv",
-                    "__pycache__",
-                    "node_modules",
-                    ".vscode",
-                    ".idea",
-                    ".memo",
-                    "test",
-                    "**/*.egg-info",
-                ],
-            ).load_data()
-
-            # 初始化 ChromaDB
-            chroma_client = chromadb.PersistentClient(path=self.chroma_db_path)
-            chroma_collection = chroma_client.get_or_create_collection("code_agent")
-            vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
-            storage_context = StorageContext.from_defaults(vector_store=vector_store)
-
-            # 构建索引
-            index = VectorStoreIndex.from_documents(
-                documents, storage_context=storage_context
-            )
-            return index
-        except Exception as e:
-            print(f"构建索引失败: {e}")
             return None
 
     def _load_index(self):
@@ -160,6 +113,209 @@ class RAGManager:
         except Exception as e:
             print(f"加载索引失败: {e}")
             return None
+
+    def _load_file_hashes(self, file_hash_file: str) -> dict[str, str]:
+        """加载文件哈希记录
+
+        Args:
+            file_hash_file: 文件哈希记录文件路径
+
+        Returns:
+            文件哈希字典
+        """
+        if os.path.exists(file_hash_file):
+            try:
+                with open(file_hash_file, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return {}
+
+    def _save_file_hashes(self, file_hash_file: str, file_hashes: dict[str, str]):
+        """保存文件哈希记录
+
+        Args:
+            file_hash_file: 文件哈希记录文件路径
+            file_hashes: 文件哈希字典
+        """
+        try:
+            with open(file_hash_file, "w", encoding="utf-8") as f:
+                json.dump(file_hashes, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"保存文件哈希记录失败: {e}")
+
+    def _calculate_file_hash(self, file_path: str) -> str:
+        """计算文件的哈希值
+
+        Args:
+            file_path: 文件路径
+
+        Returns:
+            文件哈希值
+        """
+        try:
+            hash_obj = hashlib.md5()
+            with open(file_path, "rb") as f:
+                while chunk := f.read(8192):
+                    hash_obj.update(chunk)
+            return hash_obj.hexdigest()
+        except Exception:
+            return ""
+
+    def _get_project_files_with_hashes(self) -> dict[str, str]:
+        """获取项目中的所有文件及其哈希
+
+        Returns:
+            文件哈希字典
+        """
+        file_hashes = {}
+
+        for root, dirs, files in os.walk(self.project_dir):
+            # 过滤忽略的目录
+            dirs[:] = [
+                d
+                for d in dirs
+                if not d.startswith(".")
+                and d
+                not in [
+                    ".git",
+                    ".venv",
+                    "__pycache__",
+                    "node_modules",
+                    ".vscode",
+                    ".idea",
+                    ".memo",
+                    "test",
+                ]
+            ]
+
+            for filename in files:
+                file_path = os.path.join(root, filename)
+                if self.ignore_manager.is_ignored(file_path):
+                    continue
+
+                if os.path.isfile(file_path):
+                    try:
+                        file_hash = self._calculate_file_hash(file_path)
+                        relative_path = os.path.relpath(file_path, self.project_dir)
+                        file_hashes[relative_path] = file_hash
+                    except Exception:
+                        continue
+
+        return file_hashes
+
+    def _get_changed_files(
+        self, old_hashes: dict[str, str], new_hashes: dict[str, str]
+    ) -> list[str]:
+        """获取有变化的文件
+
+        Args:
+            old_hashes: 旧的文件哈希字典
+            new_hashes: 新的文件哈希字典
+
+        Returns:
+            有变化的文件列表
+        """
+        changed_files = []
+
+        # 检查新增或修改的文件
+        for file_path, new_hash in new_hashes.items():
+            old_hash = old_hashes.get(file_path)
+            if old_hash != new_hash:
+                changed_files.append(file_path)
+
+        # 检查删除的文件（从索引中移除）
+        for file_path in old_hashes:
+            if file_path not in new_hashes:
+                changed_files.append(f"DELETED:{file_path}")
+
+        return changed_files
+
+    def _update_index(
+        self,
+        changed_files: list[str],
+        old_hashes: dict[str, str],
+        new_hashes: dict[str, str],
+    ):
+        """增量更新索引
+
+        Args:
+            changed_files: 有变化的文件列表
+            old_hashes: 旧的文件哈希字典
+            new_hashes: 新的文件哈希字典
+
+        Returns:
+            向量存储索引
+        """
+        try:
+            # 初始化 ChromaDB
+            chroma_client = chromadb.PersistentClient(path=self.chroma_db_path)
+            chroma_collection = chroma_client.get_or_create_collection("code_agent")
+
+            # 处理每个变化的文件
+            for file_path in changed_files:
+                if file_path.startswith("DELETED:"):
+                    # 删除文件
+                    relative_path = file_path[8:]  # 移除 "DELETED:" 前缀
+                    print(f"  删除索引: {relative_path}")
+                    try:
+                        # 删除对应的文档
+                        chroma_collection.delete(ids=[relative_path])
+                    except Exception as e:
+                        print(f"  删除索引失败: {e}")
+                else:
+                    # 更新文件
+                    print(f"  更新索引: {file_path}")
+                    try:
+                        full_path = os.path.join(self.project_dir, file_path)
+                        with open(full_path, "r", encoding="utf-8") as f:
+                            content = f.read()
+
+                        # 删除旧的文档
+                        try:
+                            chroma_collection.delete(ids=[file_path])
+                        except Exception:
+                            pass
+
+                        # 添加新文档
+                        chroma_collection.add(
+                            documents=[content],
+                            ids=[file_path],
+                            metadatas=[
+                                {
+                                    "file_path": file_path,
+                                    "file_name": os.path.basename(file_path),
+                                }
+                            ],
+                        )
+                    except Exception as e:
+                        print(f"  更新索引失败: {e}")
+
+            # 重新加载索引
+            return self._load_index()
+        except Exception as e:
+            print(f"更新索引失败: {e}")
+            return None
+
+    def _find_file_info(self, relative_path: str) -> dict | None:
+        """在项目上下文中查找文件信息
+
+        Args:
+            relative_path: 相对路径
+
+        Returns:
+            文件信息字典或 None
+        """
+        file_structure = self.project_context.context.get("file_structure", {})
+        assert isinstance(file_structure, dict), "file_structure should be a dict"
+        files = file_structure.get("files", [])
+        assert isinstance(files, list), "files should be a list"
+
+        for file_info in files:
+            if file_info.get("path") == relative_path:
+                return file_info
+
+        return None
 
     def retrieve_relevant_files(
         self, query: str, limit: int = 3
@@ -206,17 +362,15 @@ class RAGManager:
                     relative_path = os.path.relpath(file_path, self.project_dir)
 
                     # 从项目上下文中获取文件信息
-                    if relative_path in self.project_context.context.file_index:
-                        file_info = self.project_context.context.file_index[
-                            relative_path
-                        ]
+                    file_info = self._find_file_info(relative_path)
+                    if file_info:
                         relevant_files.append(
                             {
-                                "path": file_info.path,
-                                "size": file_info.size,
-                                "modified": file_info.modified,
-                                "extension": file_info.extension,
-                                "preview": file_info.preview,
+                                "path": file_info.get("path", relative_path),
+                                "size": file_info.get("size", 0),
+                                "modified": file_info.get("modified", 0),
+                                "extension": file_info.get("extension", ""),
+                                "preview": "",
                             }
                         )
 
@@ -225,17 +379,7 @@ class RAGManager:
             print(f"检索文件失败: {e}")
             # 回退到原始搜索方法
             file_infos = self.project_context.search_files(query, limit)
-            # 转换 FileInfo 对象为字典
-            return [
-                {
-                    "path": info.path,
-                    "size": info.size,
-                    "modified": info.modified,
-                    "extension": info.extension,
-                    "preview": info.preview,
-                }
-                for info in file_infos
-            ]
+            return file_infos
 
     def get_file_context(self, file_path: str, max_lines: int = 50) -> str | None:
         """获取文件上下文
@@ -312,14 +456,16 @@ class RAGManager:
         context_parts = ["相关文件内容:"]
 
         for i, file_info in enumerate(relevant_files, 1):
-            relative_path = os.path.relpath(file_info.path, self.project_dir)
+            relative_path = file_info.get("path", "")
             context_parts.append(f"\n{i}. {relative_path}")
 
             # 获取文件内容
-            file_content = self.get_file_context(relative_path)
+            file_content = self.project_context.get_file_content(relative_path)
             if file_content:
                 context_parts.append("```")
-                context_parts.append(file_content)
+                context_parts.append(file_content[:2000])  # 限制长度
+                if len(file_content) > 2000:
+                    context_parts.append("... (内容已截断)")
                 context_parts.append("```")
             else:
                 context_parts.append("无法读取文件内容")
@@ -342,12 +488,18 @@ class RAGManager:
         snippets = []
 
         # 获取所有文件
-        for relative_path, file_info in self.project_context.context.file_index.items():
+        file_structure = self.project_context.context.get("file_structure", {})
+        assert isinstance(file_structure, dict), "file_structure should be a dict"
+        files = file_structure.get("files", [])
+        assert isinstance(files, list), "files should be a list"
+
+        for file_info in files:
+            relative_path = file_info.get("path", "")
+            ext = file_info.get("extension", "")
+
             # 过滤文件类型
-            if file_types:
-                ext = file_info.extension
-                if ext not in file_types:
-                    continue
+            if file_types and ext not in file_types:
+                continue
 
             # 读取文件内容
             content = self.project_context.get_file_content(relative_path)

@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""
+内容搜索工具
+用于按内容搜索文件
+"""
+
+import os
+import re
+from typing import Dict, Any, List, Tuple
+from code_agent.tools.base_tool import BaseTool
+from code_agent.assert_tool import AssertTool
+
+
+class GrepTool(BaseTool):
+    """内容搜索工具"""
+
+    def __init__(self, base_dir: str = "."):
+        """初始化内容搜索工具
+
+        Args:
+            base_dir: 基础目录
+        """
+        self.base_dir = os.path.abspath(base_dir)
+
+    def name(self) -> str:
+        """获取工具名称
+
+        Returns:
+            工具名称
+        """
+        return "search_content"
+
+    def description(self) -> str:
+        """获取工具描述
+
+        Returns:
+            工具描述
+        """
+        return "按内容搜索文件"
+
+    def parameters(self) -> Dict[str, Any]:
+        """获取工具参数
+
+        Returns:
+            工具参数字典
+        """
+        return {
+            "pattern": {
+                "type": "string",
+                "description": "搜索模式，支持正则表达式",
+                "required": True,
+            },
+            "path": {
+                "type": "string",
+                "description": "搜索路径，默认为基础目录",
+                "required": False,
+            },
+            "file_pattern": {
+                "type": "string",
+                "description": "文件匹配模式，默认为所有文件",
+                "required": False,
+            },
+        }
+
+    def run(self, **kwargs) -> Dict[str, Any]:
+        """运行工具
+
+        Args:
+            **kwargs: 工具参数
+
+        Returns:
+            工具运行结果
+        """
+        try:
+            # 获取参数
+            pattern = AssertTool.assert_type(kwargs.get("pattern"), str)
+            path = kwargs.get("path", self.base_dir)
+            file_pattern = kwargs.get("file_pattern", "*")
+
+            # 构建完整路径
+            if path:
+                full_path = os.path.join(self.base_dir, path)
+                full_path = os.path.abspath(full_path)
+
+                # 检查路径是否在基础目录内
+                if not full_path.startswith(self.base_dir):
+                    return {
+                        "success": False,
+                        "message": f"搜索路径超出基础目录范围: {path}",
+                    }
+            else:
+                full_path = self.base_dir
+
+            # 检查目录是否存在
+            if not os.path.exists(full_path):
+                return {"success": False, "message": f"搜索路径不存在: {full_path}"}
+
+            # 编译正则表达式
+            regex = re.compile(pattern)
+
+            # 执行搜索
+            results: List[Dict[str, Any]] = []
+            for root, dirs, files in os.walk(full_path):
+                # 过滤目录
+                dirs[:] = [d for d in dirs if not d.startswith(".")]
+
+                for file in files:
+                    # 检查文件是否匹配模式
+                    if not self._match_file_pattern(file, file_pattern):
+                        continue
+
+                    file_path = os.path.join(root, file)
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            lines = f.readlines()
+                            for line_num, line in enumerate(lines, 1):
+                                if regex.search(line):
+                                    results.append(
+                                        {
+                                            "file": os.path.relpath(
+                                                file_path, self.base_dir
+                                            ),
+                                            "line": line_num,
+                                            "content": line.strip(),
+                                        }
+                                    )
+                    except Exception:
+                        # 跳过无法读取的文件
+                        pass
+
+            return {"success": True, "results": results}
+
+        except Exception as e:
+            return {"success": False, "message": f"搜索内容失败: {str(e)}"}
+
+    def _match_file_pattern(self, file: str, pattern: str) -> bool:
+        """检查文件是否匹配模式
+
+        Args:
+            file: 文件名
+            pattern: 文件匹配模式
+
+        Returns:
+            是否匹配
+        """
+        # 简单的通配符匹配
+        if "*" in pattern:
+            # 转换为正则表达式
+            regex_pattern = pattern.replace("*", ".*")
+            return bool(re.match(regex_pattern, file))
+        return file == pattern

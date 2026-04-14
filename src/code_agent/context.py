@@ -17,6 +17,7 @@ class GlobalContext:
         self.session_context = None
         self.agent = None
         self.code_modifier = None
+        self.model_tools = None
 
     def set_args(self, args):
         """设置命令行参数
@@ -73,6 +74,14 @@ class GlobalContext:
             code_modifier: 代码修改器实例
         """
         self.code_modifier = code_modifier
+
+    def set_model_tools(self, model_tools):
+        """设置模型工具
+
+        Args:
+            model_tools: 模型工具实例
+        """
+        self.model_tools = model_tools
 
 
 # 创建全局上下文实例

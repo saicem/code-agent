@@ -20,15 +20,4 @@ python src/code_agent/main.py --platform ollama --model Qwen3.5
 - **RAG 检索**：LlamaIndex + ChromaDB 实现代码检索
 - **智能修改**：解析代码块并应用到目标文件
 
-## 项目偏好
-
-- **现代 typing**：使用内置类型（如 `list[dict[str, Any]]`）
-- **dataclass**：优先使用 `@dataclass` 定义数据结构
-- **统一配置**：集中管理配置参数
-- **类型注解**：为函数添加类型注解
-- **谨慎 Any**：尽量减少 `Any` 使用
-- **类型检查**：每次变更后运行 `ty check`
-- **代码格式化**：修改文件后使用 `ruff format`
-- **类型策略**：优先推导确定类型，其次断言，最后才用 Any
-
 详细扩展建议见 [TODO.md](TODO.md)

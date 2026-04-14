@@ -15,7 +15,7 @@ class Config:
     session_context_max_length: int = 1000  # 会话上下文最大长度
     session_context_max_dialogues: int = 10  # 会话上下文最大对话数量
     session_context_file: str = ".memo/session_context.json"  # 会话上下文文件路径
-    user_context_file: str = ".memo/user_context.json"  # 用户上下文文件路径
+    user_context_file: str = ".memo/user_context.md"  # 用户上下文文件路径
     project_context_file: str = ".memo/project_context.json"  # 项目上下文文件路径
 
     # RAG 配置

@@ -9,12 +9,15 @@ from code_agent.context import global_context
 
 
 from code_agent.agent import CodeAgent
-from code_agent.user_context import UserContextManager
-from code_agent.project_context import ProjectContextManager
-from code_agent.session_context import SessionContextManager
+from code_agent.contexts import (
+    UserContextManager,
+    ProjectContextManager,
+    SessionContextManager,
+)
 from code_agent.rag import RAGManager
 from code_agent.code_modifier import CodeModifier
 from code_agent.commands import CommandHandler
+from code_agent.model_tools import ModelTools
 
 
 def main():
@@ -25,8 +28,8 @@ def main():
     parser.add_argument(
         "--platform",
         type=str,
-        choices=["ollama", "bailian"],
-        required=True,
+        choices=["bailian"],
+        default="bailian",
         help="平台类型",
     )
     parser.add_argument("--model", type=str, required=True, help="模型名称")
@@ -42,7 +45,9 @@ def main():
 
     # 初始化 Code Agent
     try:
-        agent = CodeAgent.create(platform=args.platform, model=args.model)
+        agent = CodeAgent.create(
+            platform=args.platform, model=args.model, base_dir=args.project_dir
+        )
         print(f"Code Agent 已启动，使用平台: {args.platform}，模型: {args.model}")
     except ValueError as e:
         print(f"初始化失败: {e}")
@@ -51,9 +56,10 @@ def main():
     # 初始化上下文管理器
     user_context = UserContextManager()
     project_context = ProjectContextManager(args.project_dir)
-    session_context = SessionContextManager()
+    session_context = SessionContextManager(platform=args.platform, model=args.model)
     rag_manager = RAGManager(project_context)
     code_modifier = CodeModifier(args.project_dir)
+    model_tools = ModelTools(args.project_dir)
 
     # 将组件存储到全局上下文
     global_context.set_args(args)
@@ -63,6 +69,7 @@ def main():
     global_context.set_session_context(session_context)
     global_context.set_agent(agent)
     global_context.set_code_modifier(code_modifier)
+    global_context.set_model_tools(model_tools)
 
     # 初始化指令处理器
     command_handler = CommandHandler()
@@ -94,7 +101,12 @@ def main():
 
         # 构建增强的提示词
         enhanced_prompt = _build_enhanced_prompt(
-            task, user_context, project_context, session_context, rag_manager
+            task,
+            user_context,
+            project_context,
+            session_context,
+            rag_manager,
+            model_tools,
         )
 
         # 调用模型
@@ -148,8 +160,7 @@ def main():
         session_context.add_dialogue(task, result_str)
 
         # 更新用户上下文
-        dialogue_history = session_context.get_recent_dialogues()
-        user_context.update_from_dialogue(dialogue_history)
+        user_context.update_from_dialogue(task, result_str)
 
         # 将输出写入文件
         if args.output:
@@ -162,7 +173,7 @@ def main():
 
 
 def _build_enhanced_prompt(
-    task, user_context, project_context, session_context, rag_manager
+    task, user_context, project_context, session_context, rag_manager, model_tools
 ):
     """构建增强的提示词
 
@@ -172,6 +183,7 @@ def _build_enhanced_prompt(
         project_context: 项目上下文管理器
         session_context: 会话上下文管理器
         rag_manager: RAG 管理器
+        model_tools: 模型工具
 
     Returns:
         增强的提示词
@@ -199,12 +211,24 @@ def _build_enhanced_prompt(
         prompt_parts.append(session_context_str)
         prompt_parts.append("")
 
-    # 添加相关文件上下文（RAG）
+    # 提取任务中的关键词并获取相关文件
     retrieval_context = rag_manager.build_retrieval_context(task)
     if retrieval_context and retrieval_context != "未找到相关文件":
         prompt_parts.append("相关文件:")
         prompt_parts.append(retrieval_context)
         prompt_parts.append("")
+
+    # 检查任务中是否包含 URL，如果有则进行网络请求
+    if model_tools.should_fetch_urls(task):
+        urls = model_tools.extract_urls(task)
+        for url in urls[:2]:  # 限制最多请求 2 个 URL
+            print(f"正在请求 URL: {url}")
+            result = model_tools.fetch_url(url)
+            if result["success"]:
+                content = result["content"][:2000]  # 限制内容长度
+                prompt_parts.append(f"网络请求结果 ({url}):")
+                prompt_parts.append(content)
+                prompt_parts.append("")
 
     # 添加任务
     prompt_parts.append("任务:")

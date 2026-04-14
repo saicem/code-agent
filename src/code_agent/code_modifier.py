@@ -6,47 +6,7 @@
 import os
 import re
 from pathlib import Path
-from dataclasses import dataclass
-
-
-@dataclass
-class CodeBlock:
-    """代码块数据类"""
-
-    language: str
-    code: str
-    type: str
-
-
-@dataclass
-class TargetFile:
-    """目标文件数据类"""
-
-    file_name: str
-    code: str
-    language: str
-    operation: str
-    is_temp: bool = False
-
-
-@dataclass
-class ApplyResult:
-    """应用结果数据类"""
-
-    file_name: str
-    operation: str
-    success: bool
-    message: str
-    is_temp: bool = False
-
-
-@dataclass
-class ChangeRecord:
-    """修改记录数据类"""
-
-    file: str
-    operation: str
-    is_temp: bool = False
+from code_agent.models import CodeBlock, FileTarget, ModificationResult
 
 
 class CodeModifier:
@@ -81,7 +41,7 @@ class CodeModifier:
             code: str = match.group(2).strip()
 
             code_blocks.append(
-                CodeBlock(language=language, code=code, type="code_block")
+                CodeBlock(language=language, content=code, file_name=None)
             )
 
         # 如果没有找到代码块，尝试匹配其他格式
@@ -103,8 +63,8 @@ class CodeModifier:
                         code_blocks.append(
                             CodeBlock(
                                 language="python",
-                                code="\n".join(current_code),
-                                type="indented_code",
+                                content="\n".join(current_code),
+                                file_name=None,
                             )
                         )
                         current_code = []
@@ -121,8 +81,8 @@ class CodeModifier:
                         code_blocks.append(
                             CodeBlock(
                                 language="python",
-                                code="\n".join(current_code),
-                                type="indented_code",
+                                content="\n".join(current_code),
+                                file_name=None,
                             )
                         )
                         current_code = []
@@ -137,8 +97,8 @@ class CodeModifier:
                 code_blocks.append(
                     CodeBlock(
                         language="python",
-                        code="\n".join(current_code),
-                        type="indented_code",
+                        content="\n".join(current_code),
+                        file_name=None,
                     )
                 )
 
@@ -146,7 +106,7 @@ class CodeModifier:
 
     def determine_target_files(
         self, code_blocks: list[CodeBlock], task: str
-    ) -> list[TargetFile]:
+    ) -> list[FileTarget]:
         """确定目标文件
 
         Args:
@@ -164,21 +124,20 @@ class CodeModifier:
 
             if file_name:
                 targets.append(
-                    TargetFile(
+                    FileTarget(
                         file_name=file_name,
-                        code=code_block.code,
-                        language=code_block.language,
+                        code=code_block.content,
                         operation=self._determine_operation(task),
+                        is_temp=False,
                     )
                 )
             else:
                 # 如果没有明确的文件名，创建临时文件
                 temp_name = self._generate_temp_filename(code_block.language)
                 targets.append(
-                    TargetFile(
+                    FileTarget(
                         file_name=temp_name,
-                        code=code_block.code,
-                        language=code_block.language,
+                        code=code_block.content,
                         operation=self._determine_operation(task),
                         is_temp=True,
                     )
@@ -284,8 +243,8 @@ class CodeModifier:
             return "create"
 
     def apply_changes(
-        self, targets: list[TargetFile], dry_run: bool = False
-    ) -> list[ApplyResult]:
+        self, targets: list[FileTarget], dry_run: bool = False
+    ) -> list[ModificationResult]:
         """应用代码修改
 
         Args:
@@ -303,13 +262,7 @@ class CodeModifier:
             operation = target.operation
             is_temp = target.is_temp
 
-            result = ApplyResult(
-                file_name=file_name,
-                operation=operation,
-                success=False,
-                message="",
-                is_temp=is_temp,
-            )
+            result = ModificationResult(success=False, message="", file_name=file_name)
 
             try:
                 file_path = self.project_dir / file_name
@@ -359,9 +312,7 @@ class CodeModifier:
 
                 if result.success:
                     self.changes_applied.append(
-                        ChangeRecord(
-                            file=file_name, operation=operation, is_temp=is_temp
-                        )
+                        {"file": file_name, "operation": operation, "is_temp": is_temp}
                     )
 
             except Exception as e:
@@ -383,9 +334,9 @@ class CodeModifier:
         summary_parts = ["已应用的修改:"]
 
         for change in self.changes_applied:
-            file_name = change.file
-            operation = change.operation
-            is_temp = change.is_temp
+            file_name = change["file"]
+            operation = change["operation"]
+            is_temp = change["is_temp"]
 
             operation_text = {
                 "create": "创建",

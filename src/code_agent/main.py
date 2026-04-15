@@ -6,6 +6,7 @@ Code Agent 主入口文件
 import argparse
 import os
 from code_agent.context import global_context
+from code_agent.config import config
 
 
 from code_agent.agent import CodeAgent
@@ -14,10 +15,7 @@ from code_agent.contexts import (
     ProjectContextManager,
     SessionContextManager,
 )
-from code_agent.rag import RAGManager
-from code_agent.code_modifier import CodeModifier
 from code_agent.commands import CommandHandler
-from code_agent.model_tools import ModelTools
 
 
 def main():
@@ -34,20 +32,11 @@ def main():
     )
     parser.add_argument("--model", type=str, required=True, help="模型名称")
     parser.add_argument("--output", type=str, help="输出文件路径")
-    parser.add_argument("--project-dir", type=str, default=".", help="项目目录路径")
-    parser.add_argument(
-        "--apply-changes", action="store_true", help="应用代码修改到文件"
-    )
     args = parser.parse_args()
-
-    # 确保项目目录是绝对路径
-    args.project_dir = os.path.abspath(args.project_dir)
 
     # 初始化 Code Agent
     try:
-        agent = CodeAgent.create(
-            platform=args.platform, model=args.model, base_dir=args.project_dir
-        )
+        agent = CodeAgent.create(platform=args.platform, model=args.model)
         print(f"Code Agent 已启动，使用平台: {args.platform}，模型: {args.model}")
     except ValueError as e:
         print(f"初始化失败: {e}")
@@ -55,21 +44,15 @@ def main():
 
     # 初始化上下文管理器
     user_context = UserContextManager()
-    project_context = ProjectContextManager(args.project_dir)
+    project_context = ProjectContextManager(config.base_dir)
     session_context = SessionContextManager(platform=args.platform, model=args.model)
-    rag_manager = RAGManager(project_context)
-    code_modifier = CodeModifier(args.project_dir)
-    model_tools = ModelTools(args.project_dir)
 
     # 将组件存储到全局上下文
     global_context.set_args(args)
-    global_context.set_rag_manager(rag_manager)
     global_context.set_user_context(user_context)
     global_context.set_project_context(project_context)
     global_context.set_session_context(session_context)
     global_context.set_agent(agent)
-    global_context.set_code_modifier(code_modifier)
-    global_context.set_model_tools(model_tools)
 
     # 初始化指令处理器
     command_handler = CommandHandler()
@@ -105,8 +88,6 @@ def main():
             user_context,
             project_context,
             session_context,
-            rag_manager,
-            model_tools,
         )
 
         # 调用模型
@@ -117,42 +98,6 @@ def main():
             continue
 
         print(f"\n结果:\n{result}")
-
-        # 解析代码块
-        code_blocks = code_modifier.parse_code_blocks(result)
-
-        if code_blocks:
-            print(f"\n检测到 {len(code_blocks)} 个代码块")
-
-            # 确定目标文件
-            targets = code_modifier.determine_target_files(code_blocks, task)
-
-            print("将要修改的文件:")
-            for target in targets:
-                operation_text = {
-                    "create": "创建",
-                    "update": "更新",
-                    "delete": "删除",
-                    "append": "追加",
-                }.get(target.operation, target.operation)
-                temp_text = " (临时文件)" if target.is_temp else ""
-                print(f"  - {operation_text} {target.file_name}{temp_text}")
-
-            # 应用修改
-            if args.apply_changes:
-                print("\n应用修改...")
-                results = code_modifier.apply_changes(targets)
-
-                for result in results:
-                    if result.success:
-                        print(f"  ✓ {result.message}")
-                    else:
-                        print(f"  ✗ {result.message}")
-
-                # 显示修改摘要
-                print(f"\n{code_modifier.get_changes_summary()}")
-            else:
-                print("\n提示: 使用 --apply-changes 参数来实际应用这些修改")
 
         # 保存到会话上下文
         # 确保 result 是字符串类型
@@ -172,9 +117,7 @@ def main():
                 print(f"写入文件失败: {e}")
 
 
-def _build_enhanced_prompt(
-    task, user_context, project_context, session_context, rag_manager, model_tools
-):
+def _build_enhanced_prompt(task, user_context, project_context, session_context):
     """构建增强的提示词
 
     Args:
@@ -182,8 +125,6 @@ def _build_enhanced_prompt(
         user_context: 用户上下文管理器
         project_context: 项目上下文管理器
         session_context: 会话上下文管理器
-        rag_manager: RAG 管理器
-        model_tools: 模型工具
 
     Returns:
         增强的提示词
@@ -210,25 +151,6 @@ def _build_enhanced_prompt(
         prompt_parts.append("会话上下文:")
         prompt_parts.append(session_context_str)
         prompt_parts.append("")
-
-    # 提取任务中的关键词并获取相关文件
-    retrieval_context = rag_manager.build_retrieval_context(task)
-    if retrieval_context and retrieval_context != "未找到相关文件":
-        prompt_parts.append("相关文件:")
-        prompt_parts.append(retrieval_context)
-        prompt_parts.append("")
-
-    # 检查任务中是否包含 URL，如果有则进行网络请求
-    if model_tools.should_fetch_urls(task):
-        urls = model_tools.extract_urls(task)
-        for url in urls[:2]:  # 限制最多请求 2 个 URL
-            print(f"正在请求 URL: {url}")
-            result = model_tools.fetch_url(url)
-            if result["success"]:
-                content = result["content"][:2000]  # 限制内容长度
-                prompt_parts.append(f"网络请求结果 ({url}):")
-                prompt_parts.append(content)
-                prompt_parts.append("")
 
     # 添加任务
     prompt_parts.append("任务:")

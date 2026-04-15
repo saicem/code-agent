@@ -5,10 +5,12 @@
 """
 
 import os
-from typing import Dict, Any
+from typing import Any
 from code_agent.tools.base_tool import BaseTool
+from code_agent.tools.tool_manager import ToolManager
 
 
+@ToolManager.register_tool
 class ReadTool(BaseTool):
     """读取工具"""
 
@@ -36,7 +38,7 @@ class ReadTool(BaseTool):
         """
         return "读取指定文件的内容。当你需要查看文件内容时使用此工具。"
 
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         """获取工具参数
 
         Returns:
@@ -53,7 +55,7 @@ class ReadTool(BaseTool):
             "required": ["file_path"],
         }
 
-    def run(self, **kwargs) -> Dict[str, Any]:
+    def run(self, **kwargs) -> dict[str, Any]:
         """运行工具
 
         Args:

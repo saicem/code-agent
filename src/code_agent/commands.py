@@ -91,10 +91,10 @@ class CommandHandler:
 
     def _handle_rag(self, command: str):
         """处理 /rag 指令"""
-        rag_manager = global_context.rag_manager
+        agent = global_context.agent
 
-        if not rag_manager:
-            print("\n错误: RAG 管理器未初始化")
+        if not agent or "search_rag" not in agent.tools:
+            print("\n错误: RAG 工具未启用")
             return
 
         # 提取命令后的文本内容
@@ -108,10 +108,13 @@ class CommandHandler:
         print(f"\n测试 RAG 检索: {query}")
         print("=" * 60)
 
-        # 构建检索上下文
-        context = rag_manager.build_retrieval_context(query)
+        # 调用 RAG 工具
+        result = agent.tools["search_rag"].run(query=query)
 
-        print(context)
+        if result.get("success"):
+            print(result.get("context", "未找到相关文件"))
+        else:
+            print(f"检索失败: {result.get('message', '未知错误')}")
         print("=" * 60)
 
     def _handle_about(self, command: str):

@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-终端命令工具
-用于执行终端命令
+终端命令执行工具
 """
 
 import os
 import subprocess
-from typing import Dict, Any
+from typing import Any
 from code_agent.tools.base_tool import BaseTool
+from code_agent.tools.tool_manager import ToolManager
 from code_agent.assert_tool import AssertTool
 
 
+@ToolManager.register_tool
 class BashTool(BaseTool):
     """终端命令工具"""
 
@@ -38,7 +39,7 @@ class BashTool(BaseTool):
         """
         return "执行终端命令，例如删除文件、移动文件、查看目录结构等"
 
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         """获取工具参数
 
         Returns:
@@ -57,7 +58,7 @@ class BashTool(BaseTool):
             },
         }
 
-    def run(self, **kwargs) -> Dict[str, Any]:
+    def run(self, **kwargs) -> dict[str, Any]:
         """运行工具
 
         Args:

@@ -11,13 +11,10 @@ class GlobalContext:
     def __init__(self):
         """初始化全局上下文"""
         self.args = None
-        self.rag_manager = None
         self.user_context = None
         self.project_context = None
         self.session_context = None
         self.agent = None
-        self.code_modifier = None
-        self.model_tools = None
 
     def set_args(self, args):
         """设置命令行参数
@@ -26,14 +23,6 @@ class GlobalContext:
             args: 命令行参数对象
         """
         self.args = args
-
-    def set_rag_manager(self, rag_manager):
-        """设置 RAG 管理器
-
-        Args:
-            rag_manager: RAG 管理器实例
-        """
-        self.rag_manager = rag_manager
 
     def set_user_context(self, user_context):
         """设置用户上下文
@@ -66,22 +55,6 @@ class GlobalContext:
             agent: Agent 实例
         """
         self.agent = agent
-
-    def set_code_modifier(self, code_modifier):
-        """设置代码修改器
-
-        Args:
-            code_modifier: 代码修改器实例
-        """
-        self.code_modifier = code_modifier
-
-    def set_model_tools(self, model_tools):
-        """设置模型工具
-
-        Args:
-            model_tools: 模型工具实例
-        """
-        self.model_tools = model_tools
 
 
 # 创建全局上下文实例

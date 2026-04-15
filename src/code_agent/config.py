@@ -4,12 +4,15 @@
 """
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
 class Config:
     """配置类"""
+
+    # 基础配置
+    base_dir: str = "."  # 基础目录
 
     # 上下文配置
     session_context_max_length: int = 1000  # 会话上下文最大长度
@@ -25,6 +28,19 @@ class Config:
     # 安全配置
     security_check_enabled: bool = True  # 是否启用安全检查
 
+    # 工具配置
+    enabled_tools: list[str] = field(
+        default_factory=lambda: [
+            "write_file",
+            "read_file",
+            "search_web",
+            "edit_file",
+            "run_bash",
+            "search_files",
+            "search_content",
+        ]
+    )  # 启用的工具列表
+
     # 日志配置
     log_file: str = "agent.log"  # 日志文件路径
     log_level: str = "INFO"  # 日志级别
@@ -33,6 +49,7 @@ class Config:
         """初始化后确保必要的目录存在"""
         # 确保必要的目录存在
         self._ensure_directories()
+        self.base_dir = os.path.abspath(self.base_dir)
 
     def _ensure_directories(self):
         """确保必要的目录存在"""

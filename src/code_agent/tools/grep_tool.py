@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-内容搜索工具
-用于按内容搜索文件
+按内容搜索文件工具
 """
 
 import os
 import re
-from typing import Dict, Any, List, Tuple
+from typing import Any
 from code_agent.tools.base_tool import BaseTool
+from code_agent.tools.tool_manager import ToolManager
 from code_agent.assert_tool import AssertTool
 
 
+@ToolManager.register_tool
 class GrepTool(BaseTool):
     """内容搜索工具"""
 
@@ -38,7 +39,7 @@ class GrepTool(BaseTool):
         """
         return "按内容搜索文件"
 
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         """获取工具参数
 
         Returns:
@@ -62,7 +63,7 @@ class GrepTool(BaseTool):
             },
         }
 
-    def run(self, **kwargs) -> Dict[str, Any]:
+    def run(self, **kwargs) -> dict[str, Any]:
         """运行工具
 
         Args:
@@ -99,7 +100,7 @@ class GrepTool(BaseTool):
             regex = re.compile(pattern)
 
             # 执行搜索
-            results: List[Dict[str, Any]] = []
+            results = []
             for root, dirs, files in os.walk(full_path):
                 # 过滤目录
                 dirs[:] = [d for d in dirs if not d.startswith(".")]

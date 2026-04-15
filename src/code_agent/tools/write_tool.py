@@ -5,10 +5,12 @@
 """
 
 import os
-from typing import Dict, Any
+from typing import Any
 from code_agent.tools.base_tool import BaseTool
+from code_agent.tools.tool_manager import ToolManager
 
 
+@ToolManager.register_tool
 class WriteTool(BaseTool):
     """写入工具"""
 
@@ -36,7 +38,7 @@ class WriteTool(BaseTool):
         """
         return "写入文件内容到指定路径。当你需要创建或修改文件时使用此工具。"
 
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         """获取工具参数
 
         Returns:
@@ -62,7 +64,7 @@ class WriteTool(BaseTool):
             "required": ["file_path", "content"],
         }
 
-    def run(self, **kwargs) -> Dict[str, Any]:
+    def run(self, **kwargs) -> dict[str, Any]:
         """运行工具
 
         Args:

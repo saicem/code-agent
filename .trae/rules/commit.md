@@ -1,3 +1,0 @@
----
-scene: git_message
----

@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """
-LlamaIndex RAG 模块（使用 ChromaDB 缓存）
+RAG 工具
+用于检索相关文件和构建检索上下文
 """
 
 import os
 import hashlib
 import json
-
-from code_agent.contexts import ProjectContextManager
+from typing import Any
+from code_agent.tools.base_tool import BaseTool
+from code_agent.tools.tool_manager import ToolManager
+from code_agent.assert_tool import AssertTool
 from code_agent.config import config
 from code_agent.file_ignore import FileIgnoreManager
-from typing import Any
 from llama_index.core import (
     VectorStoreIndex,
     Settings,
@@ -21,21 +23,21 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 import chromadb
 
 
-class RAGManager:
-    """RAG 管理类（使用 LlamaIndex 和 ChromaDB 实现）"""
+@ToolManager.register_tool
+class RagTool(BaseTool):
+    """RAG 工具"""
 
-    def __init__(self, project_context: ProjectContextManager):
-        """初始化 RAG 管理器
+    def __init__(self, base_dir: str = "."):
+        """初始化 RAG 工具
 
         Args:
-            project_context: 项目上下文管理器
+            base_dir: 基础目录
         """
-        self.project_context = project_context
-        self.project_dir = project_context.project_dir
+        self.base_dir = os.path.abspath(base_dir)
         self.chroma_db_path = config.rag_chroma_db_path
 
         # 初始化文件忽略管理器
-        self.ignore_manager = FileIgnoreManager(str(self.project_dir))
+        self.ignore_manager = FileIgnoreManager(str(self.base_dir))
 
         # 配置 LlamaIndex
         self._configure_llama_index()
@@ -50,6 +52,63 @@ class RAGManager:
             )
         else:
             self.retriever = None
+
+    def name(self) -> str:
+        """获取工具名称
+
+        Returns:
+            工具名称
+        """
+        return "search_rag"
+
+    def description(self) -> str:
+        """获取工具描述
+
+        Returns:
+            工具描述
+        """
+        return "使用 RAG 检索相关文件和构建检索上下文"
+
+    def parameters(self) -> dict[str, Any]:
+        """获取工具参数
+
+        Returns:
+            工具参数字典
+        """
+        return {
+            "query": {
+                "type": "string",
+                "description": "查询字符串",
+                "required": True,
+            },
+            "limit": {
+                "type": "integer",
+                "description": "返回文件数量限制，默认 3",
+                "required": False,
+            },
+        }
+
+    def run(self, **kwargs) -> dict[str, Any]:
+        """运行工具
+
+        Args:
+            **kwargs: 工具参数
+
+        Returns:
+            工具运行结果
+        """
+        try:
+            # 获取参数
+            query = AssertTool.assert_type(kwargs.get("query"), str)
+            limit = kwargs.get("limit", 3)
+
+            # 构建检索上下文
+            context = self.build_retrieval_context(query)
+
+            return {"success": True, "context": context}
+
+        except Exception as e:
+            return {"success": False, "message": f"RAG 工具执行失败: {str(e)}"}
 
     def _configure_llama_index(self):
         """配置 LlamaIndex"""
@@ -170,7 +229,7 @@ class RAGManager:
         """
         file_hashes = {}
 
-        for root, dirs, files in os.walk(self.project_dir):
+        for root, dirs, files in os.walk(self.base_dir):
             # 过滤忽略的目录
             dirs[:] = [
                 d
@@ -197,7 +256,7 @@ class RAGManager:
                 if os.path.isfile(file_path):
                     try:
                         file_hash = self._calculate_file_hash(file_path)
-                        relative_path = os.path.relpath(file_path, self.project_dir)
+                        relative_path = os.path.relpath(file_path, self.base_dir)
                         file_hashes[relative_path] = file_hash
                     except Exception:
                         continue
@@ -267,7 +326,7 @@ class RAGManager:
                     # 更新文件
                     print(f"  更新索引: {file_path}")
                     try:
-                        full_path = os.path.join(self.project_dir, file_path)
+                        full_path = os.path.join(self.base_dir, file_path)
                         with open(full_path, "r", encoding="utf-8") as f:
                             content = f.read()
 
@@ -297,102 +356,6 @@ class RAGManager:
             print(f"更新索引失败: {e}")
             return None
 
-    def _find_file_info(self, relative_path: str) -> dict | None:
-        """在项目上下文中查找文件信息
-
-        Args:
-            relative_path: 相对路径
-
-        Returns:
-            文件信息字典或 None
-        """
-        file_structure = self.project_context.context.get("file_structure", {})
-        assert isinstance(file_structure, dict), "file_structure should be a dict"
-        files = file_structure.get("files", [])
-        assert isinstance(files, list), "files should be a list"
-
-        for file_info in files:
-            if file_info.get("path") == relative_path:
-                return file_info
-
-        return None
-
-    def retrieve_relevant_files(
-        self, query: str, limit: int = 3
-    ) -> list[dict[str, Any]]:
-        """检索相关文件
-
-        Args:
-            query: 查询字符串
-            limit: 返回文件数量限制
-
-        Returns:
-            相关文件列表
-        """
-        if not self.index:
-            return []
-
-        try:
-            # 使用 LlamaIndex 检索相关文档
-            if self.retriever:
-                nodes = self.retriever.retrieve(query, top_k=limit)
-            else:
-                # 回退到原始搜索方法
-                file_infos = self.project_context.search_files(query, limit)
-                # 转换 FileInfo 对象为字典
-                return [
-                    {
-                        "path": info.path,
-                        "size": info.size,
-                        "modified": info.modified,
-                        "extension": info.extension,
-                        "preview": info.preview,
-                    }
-                    for info in file_infos
-                ]
-
-            # 处理检索结果
-            relevant_files = []
-            seen_files = set()
-
-            for node in nodes:
-                file_path = node.metadata.get("file_path", "")
-                if file_path and file_path not in seen_files:
-                    seen_files.add(file_path)
-                    relative_path = os.path.relpath(file_path, self.project_dir)
-
-                    # 从项目上下文中获取文件信息
-                    file_info = self._find_file_info(relative_path)
-                    if file_info:
-                        relevant_files.append(
-                            {
-                                "path": file_info.get("path", relative_path),
-                                "size": file_info.get("size", 0),
-                                "modified": file_info.get("modified", 0),
-                                "extension": file_info.get("extension", ""),
-                                "preview": "",
-                            }
-                        )
-
-            return relevant_files[:limit]
-        except Exception as e:
-            print(f"检索文件失败: {e}")
-            # 回退到原始搜索方法
-            file_infos = self.project_context.search_files(query, limit)
-            return file_infos
-
-    def get_file_context(self, file_path: str, max_lines: int = 50) -> str | None:
-        """获取文件上下文
-
-        Args:
-            file_path: 文件路径
-            max_lines: 最大行数
-
-        Returns:
-            文件上下文字符串或 None
-        """
-        return self.project_context.get_file_content(file_path)
-
     def build_retrieval_context(self, query: str) -> str:
         """构建检索上下文
 
@@ -403,16 +366,14 @@ class RAGManager:
             检索上下文字符串
         """
         if not self.index:
-            # 回退到原始方法
-            return self._build_retrieval_context_fallback(query)
+            return "RAG 索引未初始化"
 
         try:
             # 使用 LlamaIndex 检索相关文档
             if self.retriever:
                 nodes = self.retriever.retrieve(query, top_k=3)
             else:
-                # 回退到原始方法
-                return self._build_retrieval_context_fallback(query)
+                return "检索器未初始化"
 
             if not nodes:
                 return "未找到相关文件"
@@ -423,7 +384,7 @@ class RAGManager:
             for i, node in enumerate(nodes, 1):
                 file_path = node.metadata.get("file_path", "")
                 if file_path:
-                    relative_path = os.path.relpath(file_path, self.project_dir)
+                    relative_path = os.path.relpath(file_path, self.base_dir)
                     context_parts.append(f"\n{i}. {relative_path}")
                     context_parts.append("```")
                     context_parts.append(node.text[:2000])  # 限制文本长度
@@ -434,107 +395,4 @@ class RAGManager:
             return "\n".join(context_parts)
         except Exception as e:
             print(f"构建检索上下文失败: {e}")
-            # 回退到原始方法
-            return self._build_retrieval_context_fallback(query)
-
-    def _build_retrieval_context_fallback(self, query: str) -> str:
-        """构建检索上下文的回退方法
-
-        Args:
-            query: 查询字符串
-
-        Returns:
-            检索上下文字符串
-        """
-        # 检索相关文件
-        relevant_files = self.project_context.search_files(query, 3)
-
-        if not relevant_files:
-            return "未找到相关文件"
-
-        # 构建上下文
-        context_parts = ["相关文件内容:"]
-
-        for i, file_info in enumerate(relevant_files, 1):
-            relative_path = file_info.get("path", "")
-            context_parts.append(f"\n{i}. {relative_path}")
-
-            # 获取文件内容
-            file_content = self.project_context.get_file_content(relative_path)
-            if file_content:
-                context_parts.append("```")
-                context_parts.append(file_content[:2000])  # 限制长度
-                if len(file_content) > 2000:
-                    context_parts.append("... (内容已截断)")
-                context_parts.append("```")
-            else:
-                context_parts.append("无法读取文件内容")
-
-        return "\n".join(context_parts)
-
-    def search_code_snippets(
-        self, query: str, file_types: list[str] | None = None
-    ) -> list[dict[str, Any]]:
-        """搜索代码片段
-
-        Args:
-            query: 查询字符串
-            file_types: 文件类型过滤（如 ['.py', '.js']）
-
-        Returns:
-            代码片段列表
-        """
-        # 回退到原始方法
-        snippets = []
-
-        # 获取所有文件
-        file_structure = self.project_context.context.get("file_structure", {})
-        assert isinstance(file_structure, dict), "file_structure should be a dict"
-        files = file_structure.get("files", [])
-        assert isinstance(files, list), "files should be a list"
-
-        for file_info in files:
-            relative_path = file_info.get("path", "")
-            ext = file_info.get("extension", "")
-
-            # 过滤文件类型
-            if file_types and ext not in file_types:
-                continue
-
-            # 读取文件内容
-            content = self.project_context.get_file_content(relative_path)
-            if content is None:
-                continue
-
-            # 搜索匹配的行
-            lines = content.split("\n")
-            for line_num, line in enumerate(lines, 1):
-                if query.lower() in line.lower():
-                    snippets.append(
-                        {
-                            "file": relative_path,
-                            "line": line_num,
-                            "content": line.strip(),
-                            "context": self._get_line_context(lines, line_num),
-                        }
-                    )
-
-        return snippets
-
-    def _get_line_context(
-        self, lines: list[str], line_num: int, context_lines: int = 2
-    ) -> list[str]:
-        """获取行上下文
-
-        Args:
-            lines: 所有行
-            line_num: 当前行号
-            context_lines: 上下文行数
-
-        Returns:
-            上下文行列表
-        """
-        start = max(0, line_num - context_lines - 1)
-        end = min(len(lines), line_num + context_lines)
-
-        return lines[start:end]
+            return f"构建检索上下文失败: {str(e)}"

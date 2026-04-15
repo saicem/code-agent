@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-文件搜索工具
-用于按文件名模式搜索文件
+按文件名模式搜索文件工具
 """
 
 import os
 import glob
-from typing import Dict, Any, List
+from typing import Any
 from code_agent.tools.base_tool import BaseTool
+from code_agent.tools.tool_manager import ToolManager
 from code_agent.assert_tool import AssertTool
 
 
+@ToolManager.register_tool
 class GlobTool(BaseTool):
     """文件搜索工具"""
 
@@ -38,7 +39,7 @@ class GlobTool(BaseTool):
         """
         return "按文件名模式搜索文件"
 
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         """获取工具参数
 
         Returns:
@@ -57,7 +58,7 @@ class GlobTool(BaseTool):
             },
         }
 
-    def run(self, **kwargs) -> Dict[str, Any]:
+    def run(self, **kwargs) -> dict[str, Any]:
         """运行工具
 
         Args:
@@ -91,7 +92,7 @@ class GlobTool(BaseTool):
 
             # 执行搜索
             search_pattern = os.path.join(full_path, pattern)
-            files: List[str] = glob.glob(search_pattern, recursive=True)
+            files = glob.glob(search_pattern, recursive=True)
 
             # 转换为相对路径
             relative_files = [os.path.relpath(f, self.base_dir) for f in files]

@@ -5,11 +5,13 @@
 """
 
 import os
-from typing import Dict, Any
+from typing import Any
 from code_agent.tools.base_tool import BaseTool
+from code_agent.tools.tool_manager import ToolManager
 from code_agent.assert_tool import AssertTool
 
 
+@ToolManager.register_tool
 class EditTool(BaseTool):
     """文件编辑工具"""
 
@@ -37,7 +39,7 @@ class EditTool(BaseTool):
         """
         return "精确替换文件中的部分内容"
 
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         """获取工具参数
 
         Returns:
@@ -61,7 +63,7 @@ class EditTool(BaseTool):
             },
         }
 
-    def run(self, **kwargs) -> Dict[str, Any]:
+    def run(self, **kwargs) -> dict[str, Any]:
         """运行工具
 
         Args:

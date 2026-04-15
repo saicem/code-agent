@@ -5,10 +5,12 @@
 """
 
 import requests
-from typing import Dict, Any
+from typing import Any
 from code_agent.tools.base_tool import BaseTool
+from code_agent.tools.tool_manager import ToolManager
 
 
+@ToolManager.register_tool
 class SearchTool(BaseTool):
     """网络搜索工具"""
 
@@ -28,7 +30,7 @@ class SearchTool(BaseTool):
         """
         return "搜索网络内容。当你需要获取最新信息或外部知识时使用此工具。"
 
-    def parameters(self) -> Dict[str, Any]:
+    def parameters(self) -> dict[str, Any]:
         """获取工具参数
 
         Returns:
@@ -50,7 +52,7 @@ class SearchTool(BaseTool):
             "required": ["query"],
         }
 
-    def run(self, **kwargs) -> Dict[str, Any]:
+    def run(self, **kwargs) -> dict[str, Any]:
         """运行工具
 
         Args:

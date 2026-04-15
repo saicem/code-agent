@@ -83,7 +83,7 @@ def main():
             continue
 
         # 构建增强的提示词
-        enhanced_prompt = _build_enhanced_prompt(
+        enhanced_prompt = agent.build_enhanced_prompt(
             task,
             user_context,
             project_context,
@@ -115,58 +115,6 @@ def main():
                 print(f"\n结果已写入到 {args.output}")
             except Exception as e:
                 print(f"写入文件失败: {e}")
-
-
-def _build_enhanced_prompt(task, user_context, project_context, session_context):
-    """构建增强的提示词
-
-    Args:
-        task: 任务描述
-        user_context: 用户上下文管理器
-        project_context: 项目上下文管理器
-        session_context: 会话上下文管理器
-
-    Returns:
-        增强的提示词
-    """
-    prompt_parts = []
-
-    # 添加用户上下文
-    user_summary = user_context.get_context_summary()
-    if user_summary:
-        prompt_parts.append("用户上下文:")
-        prompt_parts.append(user_summary)
-        prompt_parts.append("")
-
-    # 添加项目上下文
-    project_summary = project_context.get_project_summary()
-    if project_summary:
-        prompt_parts.append("项目上下文:")
-        prompt_parts.append(project_summary)
-        prompt_parts.append("")
-
-    # 添加会话上下文
-    session_context_str = session_context.get_context()
-    if session_context_str:
-        prompt_parts.append("会话上下文:")
-        prompt_parts.append(session_context_str)
-        prompt_parts.append("")
-
-    # 添加任务
-    prompt_parts.append("任务:")
-    prompt_parts.append(task)
-
-    # 添加指令
-    prompt_parts.append("")
-    prompt_parts.append(
-        "请根据以上上下文信息完成任务。如果需要修改代码，请使用以下格式："
-    )
-    prompt_parts.append("```language")
-    prompt_parts.append("代码内容")
-    prompt_parts.append("```")
-    prompt_parts.append("并在代码块前说明要修改的文件名。")
-
-    return "\n".join(prompt_parts)
 
 
 if __name__ == "__main__":

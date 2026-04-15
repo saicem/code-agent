@@ -45,6 +45,9 @@ class Config:
     log_file: str = "agent.log"  # 日志文件路径
     log_level: str = "INFO"  # 日志级别
 
+    # 循环配置
+    react_max_cycles: int = 100  # ReAct 最大循环次数
+
     def __post_init__(self):
         """初始化后确保必要的目录存在"""
         # 确保必要的目录存在

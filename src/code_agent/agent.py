@@ -3,8 +3,7 @@
 Code Agent 类
 """
 
-from code_agent.assert_tool import AssertTool
-from typing import Iterable, Any, Dict, Union
+from typing import Iterable, Any
 from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionToolUnionParam,
@@ -68,17 +67,12 @@ class CodeAgent:
                     tool_instance = ToolManager.create_tool_instance(tool_name)
                 else:
                     # 需要 base_dir 的工具
-                    tool_instance = ToolManager.create_tool_instance(
-                        tool_name
-                    )
+                    tool_instance = ToolManager.create_tool_instance(tool_name)
 
                 if tool_instance:
                     self.tools[tool_name] = tool_instance
-                    print(f"工具 {tool_name} 已启用")
-                else:
-                    print(f"创建工具 {tool_name} 实例失败")
             except Exception as e:
-                print(f"启用工具 {tool_name} 失败: {e}")
+                pass
 
     @staticmethod
     def create(platform: str, model: str) -> "CodeAgent":
@@ -112,13 +106,26 @@ class CodeAgent:
             # 构建 ReAct 模式的消息
             messages = self._build_react_messages(task)
 
-            # 调用模型
-            response = self._call_model(messages)
+            # ReAct 循环
+            cycle_count = 0
+            while cycle_count < config.react_max_cycles:
+                # 调用模型
+                response = self._call_model(messages)
 
-            # 处理响应
-            result = self._process_response(response, messages)
+                # 处理响应
+                result, updated_messages = self._process_response(response, messages)
 
-            return result
+                # 如果有结果，返回结果
+                if result:
+                    return result
+
+                # 更新消息列表，准备下一次循环
+                messages = updated_messages
+
+                cycle_count += 1
+
+            # 循环次数超过限制
+            return f"执行超时: 达到最大循环次数 {config.react_max_cycles}"
 
         except Exception as e:
             error_message = self.error_handler.handle_error(e)
@@ -143,7 +150,9 @@ class CodeAgent:
                 for param_name, param_info in properties.items():
                     param_desc = param_info.get("description", "")
                     param_type = param_info.get("type", "string")
-                    tools_info.append(f"  - {param_name}: {param_desc} (类型: {param_type})")
+                    tools_info.append(
+                        f"  - {param_name}: {param_desc} (类型: {param_type})"
+                    )
 
         tools_info_str = "\n".join(tools_info)
 
@@ -240,7 +249,7 @@ class CodeAgent:
         self,
         completion: ChatCompletion,
         messages: Iterable[ChatCompletionMessageParam],
-    ) -> str:
+    ) -> tuple[str, list[ChatCompletionMessageParam]]:
         """处理模型响应
 
         Args:
@@ -248,13 +257,10 @@ class CodeAgent:
             messages: 消息列表
 
         Returns:
-            处理后的结果
+            处理后的结果和更新后的消息列表
         """
         # 获取响应消息
         message = completion.choices[0].message
-
-        # 转换为 JSON 字符串
-        completion_json = completion.model_dump_json()
 
         # 提取内容
         content = message.content
@@ -292,11 +298,8 @@ class CodeAgent:
                                 }
                             )
 
-                            # 再次调用模型
-                            new_response = self._call_model(messages_list)
-                            return self._process_response(
-                                new_response, messages_list
-                            )
+                            # 返回工具执行结果和更新后的消息列表
+                            return "", messages_list
                     except Exception as e:
                         # 解析错误，继续处理
                         pass
@@ -304,10 +307,10 @@ class CodeAgent:
             # 提取结论
             conclusion_start = content.find("## 结论")
             if conclusion_start != -1:
-                return content[conclusion_start:]
-            return content
+                return content[conclusion_start:], list(messages)
+            return content, list(messages)
 
-        return "模型未返回有效响应"
+        return "模型未返回有效响应", list(messages)
 
     def _extract_tool_calls(self, content: str) -> list[str]:
         """使用 XML 解析器提取工具调用信息
@@ -321,13 +324,13 @@ class CodeAgent:
         # 首先尝试匹配正确的标签格式
         pattern = r"<tool_call>([\s\S]*?)</tool_call>"
         matches = re.findall(pattern, content)
-        
+
         # 如果没有找到，尝试匹配错误的标签格式
         if not matches:
             # 匹配可能的错误标签格式，如 </tool_call></tool_call>
             pattern = r"</?tool_call>([\s\S]*?)</?tool_call>"
             matches = re.findall(pattern, content)
-        
+
         # 清理匹配结果，移除可能的多余标签
         cleaned_matches = []
         for match in matches:
@@ -335,5 +338,67 @@ class CodeAgent:
             cleaned_match = re.sub(r"</?tool_call>", "", match).strip()
             if cleaned_match:
                 cleaned_matches.append(cleaned_match)
-        
+
         return cleaned_matches
+
+    def build_enhanced_prompt(
+        self, task: str, user_context=None, project_context=None, session_context=None
+    ) -> str:
+        """构建增强的提示词
+
+        Args:
+            task: 任务描述
+            user_context: 用户上下文管理器
+            project_context: 项目上下文管理器
+            session_context: 会话上下文管理器
+
+        Returns:
+            增强的提示词
+        """
+        prompt_parts = []
+
+        # 添加用户上下文
+        if user_context:
+            user_summary = user_context.get_context_summary()
+            if user_summary:
+                prompt_parts.append("用户上下文:")
+                prompt_parts.append(user_summary)
+                prompt_parts.append("")
+
+        # 添加项目上下文
+        if project_context:
+            project_summary = project_context.get_project_summary()
+            if project_summary:
+                prompt_parts.append("项目上下文:")
+                prompt_parts.append(project_summary)
+                prompt_parts.append("")
+
+        # 添加会话上下文
+        if session_context:
+            session_context_str = session_context.get_context()
+            if session_context_str:
+                prompt_parts.append("会话上下文:")
+                prompt_parts.append(session_context_str)
+                prompt_parts.append("")
+
+        # 添加任务
+        prompt_parts.append("任务:")
+        prompt_parts.append(task)
+
+        return "\n".join(prompt_parts)
+
+    def list_enabled_tools(self) -> str:
+        """列出所有启用的工具
+
+        Returns:
+            工具列表字符串
+        """
+        if not self.tools:
+            return "没有启用的工具"
+
+        tools_info = []
+        tools_info.append("已启用的工具:")
+        for tool_name, tool in self.tools.items():
+            tools_info.append(f"- {tool_name}: {tool.description()}")
+
+        return "\n".join(tools_info)

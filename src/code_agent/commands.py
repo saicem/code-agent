@@ -21,6 +21,7 @@ class CommandHandler:
         self.register_command("/about", self._handle_about, "显示当前信息")
         self.register_command("/help", self._handle_help, "查看可用指令")
         self.register_command("/rag", self._handle_rag, "测试 RAG 检索功能")
+        self.register_command("/tools", self._handle_tools, "列出已启用的工具")
 
     def register_command(
         self, command: str, handler: Callable[[str], None], description: str
@@ -129,6 +130,15 @@ class CommandHandler:
             print(f"应用修改: {'开启' if args.apply_changes else '关闭'}")
             if args.output:
                 print(f"输出文件: {args.output}")
+
+    def _handle_tools(self, command: str):
+        """处理 /tools 指令"""
+        agent = global_context.agent
+        if not agent:
+            print("\n错误: Agent 未初始化")
+            return
+
+        print("\n" + agent.list_enabled_tools())
 
     def get_available_commands(self) -> dict[str, str]:
         """获取可用指令列表

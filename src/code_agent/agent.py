@@ -46,17 +46,24 @@ class CodeAgent:
                 )
 
                 message = response.choices[0].message
-                if message.tool_calls is None or len(message.tool_calls) == 0:
+                if message.content is not None:
                     print(f"助手消息: {message.content}")
+                    session.add_assistant_message(message.content)
+                if message.tool_calls is None or len(message.tool_calls) == 0:
+                    print("没有工具调用，任务结束")
                     break
                 else:
                     tool_calls = message.tool_calls
+                    print(f"工具调用: {tool_calls}")
                     tool_call_result = ToolManager.handle_tool_calls(tool_calls)
+                    print(f"工具调用结果: {tool_call_result}")
                     session.add_tool_messages(tool_call_result)
                 cycle_count += 1
 
-            # 循环次数超过限制
-            return f"执行超时: 达到最大循环次数 {CONFIG.react_max_cycles}"
+            if cycle_count >= CONFIG.react_max_cycles:
+                return f"执行异常: 达到最大循环次数 {CONFIG.react_max_cycles}"
+            else:
+                return "任务结束"
 
         except Exception as e:
             error_message = str(e)

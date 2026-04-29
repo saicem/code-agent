@@ -45,7 +45,7 @@ class GlobTool(BaseTool):
         Returns:
             工具描述
         """
-        return "按文件名模式搜索文件"
+        return "按文件名模式搜索文件，支持通配符 * 和 ?，支持使用 | 分隔多个模式"
 
     def parameters(self) -> dict[str, Any]:
         """获取工具参数
@@ -56,7 +56,7 @@ class GlobTool(BaseTool):
         return {
             "pattern": {
                 "type": "string",
-                "description": "文件名模式，支持通配符",
+                "description": "文件名模式，支持通配符 * 和 ?，多个模式可用 | 分隔",
                 "required": True,
             },
             "path": {
@@ -109,12 +109,41 @@ class GlobTool(BaseTool):
                     ensure_ascii=False,
                 )
 
-            # 执行搜索
-            search_pattern = os.path.join(full_path, validated_params.pattern)
-            files = glob.glob(search_pattern, recursive=True)
+            # 处理模式
+            pattern = validated_params.pattern.strip()
 
-            # 转换为相对路径
-            relative_files = [os.path.relpath(f, self.base_dir) for f in files]
+            # 移除可能的工具名前缀（如 glob_tool* -> *）
+            tool_prefixes = ["glob_tool", "search_files", "search"]
+            for prefix in tool_prefixes:
+                if pattern.lower().startswith(prefix.lower()):
+                    pattern = pattern[len(prefix) :]
+                    break
+
+            # 处理多个模式（用 | 分隔）
+            if "|" in pattern:
+                patterns = [p.strip() for p in pattern.split("|") if p.strip()]
+            else:
+                patterns = [pattern]
+
+            # 执行搜索
+            all_files: set[str] = set()
+            for pat in patterns:
+                # 如果模式不包含路径分隔符，自动添加 **/ 前缀以搜索所有子目录
+                if pat and not os.path.dirname(pat) and not pat.startswith("**"):
+                    pat = os.path.join("**", pat)
+
+                search_pattern = os.path.join(full_path, pat)
+                try:
+                    files = glob.glob(search_pattern, recursive=True)
+                    all_files.update(files)
+                except Exception:
+                    # 忽略无效的模式
+                    continue
+
+            # 转换为相对路径并排序
+            relative_files = sorted(
+                [os.path.relpath(f, self.base_dir) for f in all_files]
+            )
 
             return json.dumps(
                 {"success": True, "files": relative_files}, ensure_ascii=False

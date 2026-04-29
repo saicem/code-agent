@@ -56,7 +56,7 @@ class Config(BaseSettings):
     log_level: str = Field(default="INFO", description="日志级别")
 
     # 循环配置
-    react_max_cycles: int = Field(default=100, description="ReAct 最大循环次数")
+    react_max_cycles: int = Field(default=20, description="ReAct 最大循环次数")
 
     @model_validator(mode="after")
     def _post_init(self) -> "Config":

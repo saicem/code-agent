@@ -28,6 +28,10 @@ def main():
     # 循环对话
     while True:
         task = input("\n任务: ")
+
+        if task.strip() == "":
+            continue
+
         if COMMAND_HANDLER.handle_command(task):
             continue
 

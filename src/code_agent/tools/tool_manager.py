@@ -3,7 +3,7 @@
 工具管理类
 """
 
-from typing import Iterable, Optional
+from typing import Iterable
 
 from openai.types.chat import (
     ChatCompletionToolUnionParam,
@@ -32,10 +32,10 @@ class ToolManager:
         Returns:
             工具类
         """
-        # 获取工具名称
-        tool_name = tool_class.name(tool_class())
-        cls._registered_tools[tool_name] = tool_class()
-        cls._build_tool_info(tool_name, tool_class())
+        tool = tool_class()
+        tool_name = tool.name()
+        cls._registered_tools[tool_name] = tool
+        cls._build_tool_info(tool_name, tool)
         return tool_class
 
     @classmethod

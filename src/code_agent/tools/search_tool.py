@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
 网络搜索工具
-用于搜索网络内容
+使用 DuckDuckGo 搜索
 """
 
-import requests
 import json
 from typing import Any
 from pydantic import BaseModel, Field, ValidationError
 from code_agent.tools.base_tool import BaseTool
 from code_agent.tools.tool_manager import ToolManager
+
+from ddgs import DDGS
 
 
 class SearchParams(BaseModel):
@@ -78,32 +79,20 @@ class SearchTool(BaseTool):
                 )
 
             try:
-                # 使用 Google 搜索 API
-                # 注意：这里使用的是一个示例 API，实际使用时需要替换为真实的 API
-                url = "https://www.googleapis.com/customsearch/v1"
-                # 这里需要填入真实的 API Key 和 CX
-                request_params = {
-                    "q": validated_params.query,
-                    "key": "YOUR_API_KEY",
-                    "cx": "YOUR_CX",
-                    "num": validated_params.limit,
-                }
-
-                response = requests.get(url, params=request_params, timeout=10)
-                response.raise_for_status()
-
-                data = response.json()
-                items = data.get("items", [])
-
-                results = []
-                for item in items:
-                    results.append(
-                        {
-                            "title": item.get("title"),
-                            "link": item.get("link"),
-                            "snippet": item.get("snippet"),
-                        }
-                    )
+                # 使用 DuckDuckGo 搜索
+                with DDGS() as ddgs:
+                    results = []
+                    for result in ddgs.text(
+                        validated_params.query,
+                        max_results=validated_params.limit,
+                    ):
+                        results.append(
+                            {
+                                "title": result.get("title"),
+                                "link": result.get("href"),
+                                "snippet": result.get("body"),
+                            }
+                        )
 
                 return json.dumps(
                     {
@@ -114,24 +103,12 @@ class SearchTool(BaseTool):
                     ensure_ascii=False,
                 )
             except Exception as e:
-                # 如果 API 调用失败，返回模拟结果
+                # 如果搜索失败，返回错误信息
                 return json.dumps(
                     {
-                        "success": True,
-                        "results": [
-                            {
-                                "title": f"搜索结果 1 for {validated_params.query}",
-                                "link": "https://example.com/1",
-                                "snippet": f"这是关于 {validated_params.query} 的搜索结果 1",
-                            },
-                            {
-                                "title": f"搜索结果 2 for {validated_params.query}",
-                                "link": "https://example.com/2",
-                                "snippet": f"这是关于 {validated_params.query} 的搜索结果 2",
-                            },
-                        ],
+                        "success": False,
+                        "message": f"搜索失败: {str(e)}",
                         "query": validated_params.query,
-                        "warning": "使用模拟搜索结果，因为未配置真实的搜索 API",
                     },
                     ensure_ascii=False,
                 )

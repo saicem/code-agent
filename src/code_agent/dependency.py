@@ -1,4 +1,3 @@
-from code_agent.tools.tool_manager import ToolManager
 from code_agent.helpers.file_ignore import FileIgnoreManager
 from code_agent.session import SessionManager
 from code_agent.commands import CommandHandler

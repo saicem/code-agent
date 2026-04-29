@@ -4,7 +4,6 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 
 class BaseTool(ABC):
@@ -29,7 +28,7 @@ class BaseTool(ABC):
         pass
 
     @abstractmethod
-    def parameters(self) -> dict[str, Any]:
+    def parameters(self) -> dict[str, object]:
         """获取工具参数
 
         Returns:
@@ -38,11 +37,8 @@ class BaseTool(ABC):
         pass
 
     @abstractmethod
-    def run(self, **kwargs) -> dict[str, Any]:
+    def run(self, params: str) -> str:
         """运行工具
-
-        Args:
-            **kwargs: 工具参数
 
         Returns:
             工具运行结果

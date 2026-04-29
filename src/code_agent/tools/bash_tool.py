@@ -5,10 +5,18 @@
 
 import os
 import subprocess
+import json
 from typing import Any
+from pydantic import BaseModel, Field, ValidationError
 from code_agent.tools.base_tool import BaseTool
 from code_agent.tools.tool_manager import ToolManager
-from code_agent.assert_tool import AssertTool
+
+
+class BashParams(BaseModel):
+    """Bash 工具参数模型"""
+
+    command: str = Field(..., description="要执行的终端命令")
+    cwd: str | None = Field(None, description="命令执行的工作目录，默认为基础目录")
 
 
 @ToolManager.register_tool
@@ -58,41 +66,52 @@ class BashTool(BaseTool):
             },
         }
 
-    def run(self, **kwargs) -> dict[str, Any]:
+    def run(self, params: str) -> str:
         """运行工具
 
         Args:
-            **kwargs: 工具参数
+            params: JSON 格式的参数字符串
 
         Returns:
-            工具运行结果
+            JSON 格式的结果字符串
         """
         try:
-            # 获取参数
-            command = AssertTool.assert_type(kwargs.get("command"), str)
-            cwd = kwargs.get("cwd", self.base_dir)
+            # 使用 Pydantic 验证参数
+            try:
+                validated_params = BashParams.model_validate_json(params)
+            except ValidationError as e:
+                return json.dumps(
+                    {"success": False, "message": f"参数验证失败: {str(e)}"},
+                    ensure_ascii=False,
+                )
 
             # 构建完整路径
-            if cwd:
-                full_cwd = os.path.join(self.base_dir, cwd)
+            if validated_params.cwd:
+                full_cwd = os.path.join(self.base_dir, validated_params.cwd)
                 full_cwd = os.path.abspath(full_cwd)
 
                 # 检查路径是否在基础目录内
                 if not full_cwd.startswith(self.base_dir):
-                    return {
-                        "success": False,
-                        "message": f"工作目录超出基础目录范围: {cwd}",
-                    }
+                    return json.dumps(
+                        {
+                            "success": False,
+                            "message": f"工作目录超出基础目录范围: {validated_params.cwd}",
+                        },
+                        ensure_ascii=False,
+                    )
             else:
                 full_cwd = self.base_dir
 
             # 检查目录是否存在
             if not os.path.exists(full_cwd):
-                return {"success": False, "message": f"工作目录不存在: {full_cwd}"}
+                return json.dumps(
+                    {"success": False, "message": f"工作目录不存在: {full_cwd}"},
+                    ensure_ascii=False,
+                )
 
             # 执行命令
             result = subprocess.run(
-                command,
+                validated_params.command,
                 shell=True,
                 cwd=full_cwd,
                 capture_output=True,
@@ -100,12 +119,23 @@ class BashTool(BaseTool):
                 timeout=30,
             )
 
-            return {
-                "success": result.returncode == 0,
-                "returncode": result.returncode,
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-            }
+            return json.dumps(
+                {
+                    "success": result.returncode == 0,
+                    "returncode": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                },
+                ensure_ascii=False,
+            )
 
+        except json.JSONDecodeError as e:
+            return json.dumps(
+                {"success": False, "message": f"JSON 解析失败: {str(e)}"},
+                ensure_ascii=False,
+            )
         except Exception as e:
-            return {"success": False, "message": f"执行命令失败: {str(e)}"}
+            return json.dumps(
+                {"success": False, "message": f"执行命令失败: {str(e)}"},
+                ensure_ascii=False,
+            )

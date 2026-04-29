@@ -5,10 +5,18 @@
 
 import os
 import glob
+import json
 from typing import Any
+from pydantic import BaseModel, Field, ValidationError
 from code_agent.tools.base_tool import BaseTool
 from code_agent.tools.tool_manager import ToolManager
-from code_agent.assert_tool import AssertTool
+
+
+class GlobParams(BaseModel):
+    """Glob 工具参数模型"""
+
+    pattern: str = Field(..., description="文件名模式，支持通配符")
+    path: str | None = Field(None, description="搜索路径，默认为基础目录")
 
 
 @ToolManager.register_tool
@@ -58,46 +66,67 @@ class GlobTool(BaseTool):
             },
         }
 
-    def run(self, **kwargs) -> dict[str, Any]:
+    def run(self, params: str) -> str:
         """运行工具
 
         Args:
-            **kwargs: 工具参数
+            params: JSON 格式的参数字符串
 
         Returns:
-            工具运行结果
+            JSON 格式的结果字符串
         """
         try:
-            # 获取参数
-            pattern = AssertTool.assert_type(kwargs.get("pattern"), str)
-            path = kwargs.get("path", self.base_dir)
+            # 使用 Pydantic 验证参数
+            try:
+                validated_params = GlobParams.model_validate_json(params)
+            except ValidationError as e:
+                return json.dumps(
+                    {"success": False, "message": f"参数验证失败: {str(e)}"},
+                    ensure_ascii=False,
+                )
 
             # 构建完整路径
-            if path:
-                full_path = os.path.join(self.base_dir, path)
+            if validated_params.path:
+                full_path = os.path.join(self.base_dir, validated_params.path)
                 full_path = os.path.abspath(full_path)
 
                 # 检查路径是否在基础目录内
                 if not full_path.startswith(self.base_dir):
-                    return {
-                        "success": False,
-                        "message": f"搜索路径超出基础目录范围: {path}",
-                    }
+                    return json.dumps(
+                        {
+                            "success": False,
+                            "message": f"搜索路径超出基础目录范围: {validated_params.path}",
+                        },
+                        ensure_ascii=False,
+                    )
             else:
                 full_path = self.base_dir
 
             # 检查目录是否存在
             if not os.path.exists(full_path):
-                return {"success": False, "message": f"搜索路径不存在: {full_path}"}
+                return json.dumps(
+                    {"success": False, "message": f"搜索路径不存在: {full_path}"},
+                    ensure_ascii=False,
+                )
 
             # 执行搜索
-            search_pattern = os.path.join(full_path, pattern)
+            search_pattern = os.path.join(full_path, validated_params.pattern)
             files = glob.glob(search_pattern, recursive=True)
 
             # 转换为相对路径
             relative_files = [os.path.relpath(f, self.base_dir) for f in files]
 
-            return {"success": True, "files": relative_files}
+            return json.dumps(
+                {"success": True, "files": relative_files}, ensure_ascii=False
+            )
 
+        except json.JSONDecodeError as e:
+            return json.dumps(
+                {"success": False, "message": f"JSON 解析失败: {str(e)}"},
+                ensure_ascii=False,
+            )
         except Exception as e:
-            return {"success": False, "message": f"搜索文件失败: {str(e)}"}
+            return json.dumps(
+                {"success": False, "message": f"搜索文件失败: {str(e)}"},
+                ensure_ascii=False,
+            )

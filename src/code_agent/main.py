@@ -10,13 +10,15 @@ from code_agent.dependency import (
     SESSION_MANAGER,
     COMMAND_HANDLER,
     CONFIG,
+    CURRENT_SESSION,
 )
 from code_agent.agent import CodeAgent
 
 
 def main():
-    session = SESSION_MANAGER.load_last_session() or SESSION_MANAGER.create_session()
-    session.set_system_prompt(system_prompt)
+    CURRENT_SESSION.set(
+        SESSION_MANAGER.load_last_session() or SESSION_MANAGER.create_session()
+    )
     agent = CodeAgent(CONFIG.api_key, CONFIG.base_url)
     print("Code Agent 已启动")
     print("\n" + "=" * 50)
@@ -35,6 +37,8 @@ def main():
         if COMMAND_HANDLER.handle_command(task):
             continue
 
+        session = CURRENT_SESSION.get()
+        session.set_system_prompt(system_prompt)
         session.add_user_message(task)
 
         # 调用模型

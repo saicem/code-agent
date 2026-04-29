@@ -168,7 +168,9 @@ class SessionManager:
             会话实例
         """
         session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return Session(session_id)
+        session = Session(session_id)
+        self.save_session(session)
+        return session
 
     def save_session(self, session: Session):
         """保存会话"""

@@ -39,20 +39,14 @@ class Config(BaseSettings):
         default="",
         description="会话上下文文件路径",
     )
-    memory_file: str = Field(
-        default="", description="记忆文件路径"
-    )
-    sessions_dir: str = Field(
-        default="", description="会话目录"
-    )
+    memory_file: str = Field(default="", description="记忆文件路径")
+    sessions_dir: str = Field(default="", description="会话目录")
 
     # 安全配置
     security_check_enabled: bool = Field(default=True, description="是否启用安全检查")
 
     # 日志配置
-    log_file: str = Field(
-        default="", description="日志文件路径"
-    )
+    log_file: str = Field(default="", description="日志文件路径")
     log_level: str = Field(default="INFO", description="日志级别")
 
     # 循环配置
@@ -72,7 +66,7 @@ class Config(BaseSettings):
             self.sessions_dir = join(self.storage_dir, "sessions")
         if not self.log_file:
             self.log_file = join(self.base_dir, "agent.log")
-        
+
         self._ensure_directories()
         return self
 

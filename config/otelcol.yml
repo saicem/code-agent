@@ -1,0 +1,35 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  # 发送 traces 到 Tempo
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  otlp_http/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: "otelcol"
+
+service:
+  pipelines:
+    traces:
+      receivers: [ otlp ]
+      exporters: [ otlp/tempo ]
+    logs:
+      receivers: [ otlp ]
+      exporters: [ otlp_http/loki ]
+    metrics:
+      receivers: [ otlp ]
+      exporters: [ prometheus ]

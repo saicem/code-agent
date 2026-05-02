@@ -18,33 +18,13 @@ class TimeParams(BaseModel):
     pass
 
 
-@ToolManager.register_tool
+@ToolManager.register_tool(
+    name="get_current_time",
+    description="获取当前时间。当你需要知道当前时间或处理与时间相关的问题时调用此工具。",
+    param_type=TimeParams,
+)
 class TimeTool(BaseTool):
     """获取当前时间工具"""
-
-    def name(self) -> str:
-        """获取工具名称
-
-        Returns:
-            工具名称
-        """
-        return "get_current_time"
-
-    def description(self) -> str:
-        """获取工具描述
-
-        Returns:
-            工具描述
-        """
-        return "获取当前时间。当你需要知道当前时间或处理与时间相关的问题时调用此工具。"
-
-    def parameters(self) -> dict[str, Any]:
-        """获取工具参数
-
-        Returns:
-            工具参数字典
-        """
-        return {}
 
     def run(self, params: str) -> str:
         """运行工具

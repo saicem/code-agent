@@ -6,7 +6,6 @@
 import os
 import subprocess
 import json
-from typing import Any
 from pydantic import BaseModel, Field, ValidationError
 from code_agent.tools.base_tool import BaseTool
 from code_agent.tools.tool_manager import ToolManager
@@ -19,7 +18,11 @@ class BashParams(BaseModel):
     cwd: str | None = Field(None, description="命令执行的工作目录，默认为基础目录")
 
 
-@ToolManager.register_tool
+@ToolManager.register_tool(
+    name="run_bash",
+    description="执行终端命令，例如删除文件、移动文件、查看目录结构等",
+    param_type=BashParams,
+)
 class BashTool(BaseTool):
     """终端命令工具"""
 
@@ -30,41 +33,6 @@ class BashTool(BaseTool):
             base_dir: 基础目录
         """
         self.base_dir = os.path.abspath(base_dir)
-
-    def name(self) -> str:
-        """获取工具名称
-
-        Returns:
-            工具名称
-        """
-        return "run_bash"
-
-    def description(self) -> str:
-        """获取工具描述
-
-        Returns:
-            工具描述
-        """
-        return "执行终端命令，例如删除文件、移动文件、查看目录结构等"
-
-    def parameters(self) -> dict[str, Any]:
-        """获取工具参数
-
-        Returns:
-            工具参数字典
-        """
-        return {
-            "command": {
-                "type": "string",
-                "description": "要执行的终端命令",
-                "required": True,
-            },
-            "cwd": {
-                "type": "string",
-                "description": "命令执行的工作目录，默认为基础目录",
-                "required": False,
-            },
-        }
 
     def run(self, params: str) -> str:
         """运行工具

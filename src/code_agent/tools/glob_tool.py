@@ -6,7 +6,6 @@
 import os
 import glob
 import json
-from typing import Any
 from pydantic import BaseModel, Field, ValidationError
 from code_agent.tools.base_tool import BaseTool
 from code_agent.tools.tool_manager import ToolManager
@@ -19,7 +18,11 @@ class GlobParams(BaseModel):
     path: str | None = Field(None, description="搜索路径，默认为基础目录")
 
 
-@ToolManager.register_tool
+@ToolManager.register_tool(
+    name="search_files",
+    description="按文件名模式搜索文件，支持通配符 * 和 ?，支持使用 | 分隔多个模式",
+    param_type=GlobParams,
+)
 class GlobTool(BaseTool):
     """文件搜索工具"""
 
@@ -30,41 +33,6 @@ class GlobTool(BaseTool):
             base_dir: 基础目录
         """
         self.base_dir = os.path.abspath(base_dir)
-
-    def name(self) -> str:
-        """获取工具名称
-
-        Returns:
-            工具名称
-        """
-        return "search_files"
-
-    def description(self) -> str:
-        """获取工具描述
-
-        Returns:
-            工具描述
-        """
-        return "按文件名模式搜索文件，支持通配符 * 和 ?，支持使用 | 分隔多个模式"
-
-    def parameters(self) -> dict[str, Any]:
-        """获取工具参数
-
-        Returns:
-            工具参数字典
-        """
-        return {
-            "pattern": {
-                "type": "string",
-                "description": "文件名模式，支持通配符 * 和 ?，多个模式可用 | 分隔",
-                "required": True,
-            },
-            "path": {
-                "type": "string",
-                "description": "搜索路径，默认为基础目录",
-                "required": False,
-            },
-        }
 
     def run(self, params: str) -> str:
         """运行工具

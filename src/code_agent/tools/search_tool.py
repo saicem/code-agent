@@ -5,7 +5,6 @@
 """
 
 import json
-from typing import Any
 from pydantic import BaseModel, Field, ValidationError
 from code_agent.tools.base_tool import BaseTool
 from code_agent.tools.tool_manager import ToolManager
@@ -20,44 +19,13 @@ class SearchParams(BaseModel):
     limit: int = Field(3, description="返回结果数量，默认为 3")
 
 
-@ToolManager.register_tool
+@ToolManager.register_tool(
+    name="search_web",
+    description="搜索网络内容。当你需要获取最新信息或外部知识时使用此工具。",
+    param_type=SearchParams,
+)
 class SearchTool(BaseTool):
     """网络搜索工具"""
-
-    def name(self) -> str:
-        """获取工具名称
-
-        Returns:
-            工具名称
-        """
-        return "search_web"
-
-    def description(self) -> str:
-        """获取工具描述
-
-        Returns:
-            工具描述
-        """
-        return "搜索网络内容。当你需要获取最新信息或外部知识时使用此工具。"
-
-    def parameters(self) -> dict[str, Any]:
-        """获取工具参数
-
-        Returns:
-            工具参数字典
-        """
-        return {
-            "query": {
-                "type": "string",
-                "description": "搜索查询词",
-                "required": True,
-            },
-            "limit": {
-                "type": "integer",
-                "description": "返回结果数量，默认为 3",
-                "required": False,
-            },
-        }
 
     def run(self, params: str) -> str:
         """运行工具

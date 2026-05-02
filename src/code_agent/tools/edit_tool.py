@@ -6,7 +6,6 @@
 
 import os
 import json
-from typing import Any
 from pydantic import BaseModel, Field, ValidationError
 from code_agent.tools.base_tool import BaseTool
 from code_agent.tools.tool_manager import ToolManager
@@ -20,7 +19,9 @@ class EditParams(BaseModel):
     new_string: str = Field(..., description="要替换的新字符串")
 
 
-@ToolManager.register_tool
+@ToolManager.register_tool(
+    name="edit_file", description="精确替换文件中的部分内容", param_type=EditParams
+)
 class EditTool(BaseTool):
     """文件编辑工具"""
 
@@ -31,46 +32,6 @@ class EditTool(BaseTool):
             base_dir: 基础目录
         """
         self.base_dir = os.path.abspath(base_dir)
-
-    def name(self) -> str:
-        """获取工具名称
-
-        Returns:
-            工具名称
-        """
-        return "edit_file"
-
-    def description(self) -> str:
-        """获取工具描述
-
-        Returns:
-            工具描述
-        """
-        return "精确替换文件中的部分内容"
-
-    def parameters(self) -> dict[str, Any]:
-        """获取工具参数
-
-        Returns:
-            工具参数字典
-        """
-        return {
-            "file_path": {
-                "type": "string",
-                "description": "文件路径",
-                "required": True,
-            },
-            "old_string": {
-                "type": "string",
-                "description": "要替换的旧字符串",
-                "required": True,
-            },
-            "new_string": {
-                "type": "string",
-                "description": "要替换的新字符串",
-                "required": True,
-            },
-        }
 
     def run(self, params: str) -> str:
         """运行工具
@@ -108,7 +69,10 @@ class EditTool(BaseTool):
             # 检查文件是否存在
             if not os.path.exists(full_path):
                 return json.dumps(
-                    {"success": False, "message": f"文件不存在: {validated_params.file_path}"},
+                    {
+                        "success": False,
+                        "message": f"文件不存在: {validated_params.file_path}",
+                    },
                     ensure_ascii=False,
                 )
 
@@ -127,14 +91,19 @@ class EditTool(BaseTool):
                 )
 
             # 替换内容
-            new_content = content.replace(validated_params.old_string, validated_params.new_string)
+            new_content = content.replace(
+                validated_params.old_string, validated_params.new_string
+            )
 
             # 写入文件
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(new_content)
 
             return json.dumps(
-                {"success": True, "message": f"文件编辑成功: {validated_params.file_path}"},
+                {
+                    "success": True,
+                    "message": f"文件编辑成功: {validated_params.file_path}",
+                },
                 ensure_ascii=False,
             )
 

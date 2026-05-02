@@ -20,7 +20,11 @@ class GrepParams(BaseModel):
     file_pattern: str = Field("*", description="文件匹配模式，默认为所有文件")
 
 
-@ToolManager.register_tool
+@ToolManager.register_tool(
+    name="search_content",
+    description="按内容搜索文件",
+    param_type=GrepParams,
+)
 class GrepTool(BaseTool):
     """内容搜索工具"""
 
@@ -31,46 +35,6 @@ class GrepTool(BaseTool):
             base_dir: 基础目录
         """
         self.base_dir = os.path.abspath(base_dir)
-
-    def name(self) -> str:
-        """获取工具名称
-
-        Returns:
-            工具名称
-        """
-        return "search_content"
-
-    def description(self) -> str:
-        """获取工具描述
-
-        Returns:
-            工具描述
-        """
-        return "按内容搜索文件"
-
-    def parameters(self) -> dict[str, Any]:
-        """获取工具参数
-
-        Returns:
-            工具参数字典
-        """
-        return {
-            "pattern": {
-                "type": "string",
-                "description": "搜索模式，支持正则表达式",
-                "required": True,
-            },
-            "path": {
-                "type": "string",
-                "description": "搜索路径，默认为基础目录",
-                "required": False,
-            },
-            "file_pattern": {
-                "type": "string",
-                "description": "文件匹配模式，默认为所有文件",
-                "required": False,
-            },
-        }
 
     def run(self, params: str) -> str:
         """运行工具
@@ -126,7 +90,9 @@ class GrepTool(BaseTool):
 
                 for file in files:
                     # 检查文件是否匹配模式
-                    if not self._match_file_pattern(file, validated_params.file_pattern):
+                    if not self._match_file_pattern(
+                        file, validated_params.file_pattern
+                    ):
                         continue
 
                     file_path = os.path.join(root, file)

@@ -26,7 +26,10 @@ class Config(BaseSettings):
 
     # 基础配置
     base_dir: str = Field(default=".", description="基础目录")
-    storage_dir: str = Field(default="", description="存储目录")
+    storage_dir: str = Field(
+        default_factory=lambda data: join(data["base_dir"], ".memo"),
+        description="存储目录",
+    )
 
     # 上下文配置
     session_context_max_length: int = Field(
@@ -36,37 +39,34 @@ class Config(BaseSettings):
         default=10, description="会话上下文最大对话数量"
     )
     session_context_file: str = Field(
-        default="",
+        default_factory=lambda data: join(data["storage_dir"], "session_context.json"),
         description="会话上下文文件路径",
     )
-    memory_file: str = Field(default="", description="记忆文件路径")
-    sessions_dir: str = Field(default="", description="会话目录")
+    memory_file: str = Field(
+        default_factory=lambda data: join(data["storage_dir"], "memory.md"),
+        description="记忆文件路径",
+    )
+    sessions_dir: str = Field(
+        default_factory=lambda data: join(data["storage_dir"], "sessions"),
+        description="会话目录",
+    )
 
     # 安全配置
     security_check_enabled: bool = Field(default=True, description="是否启用安全检查")
 
     # 日志配置
-    log_file: str = Field(default="", description="日志文件路径")
+    log_file: str = Field(
+        default_factory=lambda data: join(data["base_dir"], "agent.log"),
+        description="日志文件路径",
+    )
     log_level: str = Field(default="INFO", description="日志级别")
+    otlp_enabled: bool = Field(default=False, description="是否启用 OTLP 导出器")
 
     # 循环配置
     react_max_cycles: int = Field(default=20, description="ReAct 最大循环次数")
 
     @model_validator(mode="after")
     def _post_init(self) -> "Config":
-        """初始化后确保必要的目录存在并处理路径"""
-        # 设置默认路径
-        if not self.storage_dir:
-            self.storage_dir = join(self.base_dir, ".memo")
-        if not self.session_context_file:
-            self.session_context_file = join(self.storage_dir, "session_context.json")
-        if not self.memory_file:
-            self.memory_file = join(self.storage_dir, "memory.md")
-        if not self.sessions_dir:
-            self.sessions_dir = join(self.storage_dir, "sessions")
-        if not self.log_file:
-            self.log_file = join(self.base_dir, "agent.log")
-
         self._ensure_directories()
         return self
 

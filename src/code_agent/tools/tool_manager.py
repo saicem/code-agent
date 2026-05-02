@@ -3,7 +3,8 @@
 工具管理类
 """
 
-from typing import Iterable
+from pydantic import BaseModel, TypeAdapter
+from typing import Iterable, Callable
 
 from openai.types.chat import (
     ChatCompletionToolUnionParam,
@@ -23,20 +24,27 @@ class ToolManager:
     _tools_info: dict[str, ChatCompletionToolUnionParam] = {}
 
     @classmethod
-    def register_tool(cls, tool_class: type[BaseTool]) -> type[BaseTool]:
+    def register_tool(
+        cls, name: str, description: str, param_type: type[BaseModel]
+    ) -> Callable[[type[BaseTool]], type[BaseTool]]:
         """注册工具装饰器
 
         Args:
-            tool_class: 工具类
+            name: 工具名称
+            description: 工具描述
+            param_type: 工具参数模型类
 
         Returns:
-            工具类
+            工具类装饰器
         """
-        tool = tool_class()
-        tool_name = tool.name()
-        cls._registered_tools[tool_name] = tool
-        cls._build_tool_info(tool_name, tool)
-        return tool_class
+
+        def wrapper(tool_class: type[BaseTool]) -> type[BaseTool]:
+            tool = tool_class()
+            cls._registered_tools[name] = tool
+            cls._build_tool_info(name, description, param_type)
+            return tool_class
+
+        return wrapper
 
     @classmethod
     def get_tool(cls, tool_name: str) -> BaseTool | None:
@@ -60,18 +68,19 @@ class ToolManager:
         return cls._tools_info.values()
 
     @classmethod
-    def _build_tool_info(cls, name: str, tool: BaseTool):
+    def _build_tool_info(cls, name: str, description: str, param_type: type[BaseModel]):
         """构建工具信息
 
         Returns:
             工具信息列表
         """
+
         tool_info: ChatCompletionFunctionToolParam = {
             "type": "function",
             "function": {
                 "name": name,
-                "description": tool.description(),
-                "parameters": tool.parameters(),
+                "description": description,
+                "parameters": TypeAdapter(param_type).json_schema(mode="serialization"),
             },
         }
         cls._tools_info[name] = tool_info

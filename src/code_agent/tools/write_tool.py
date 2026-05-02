@@ -6,7 +6,6 @@
 
 import os
 import json
-from typing import Any
 from pydantic import BaseModel, Field, ValidationError
 from code_agent.tools.base_tool import BaseTool
 from code_agent.tools.tool_manager import ToolManager
@@ -20,7 +19,11 @@ class WriteParams(BaseModel):
     overwrite: bool = Field(True, description="是否覆盖现有文件，默认为 True")
 
 
-@ToolManager.register_tool
+@ToolManager.register_tool(
+    name="write_file",
+    description="写入文件内容到指定路径。当你需要创建或修改文件时使用此工具。",
+    param_type=WriteParams,
+)
 class WriteTool(BaseTool):
     """写入工具"""
 
@@ -31,46 +34,6 @@ class WriteTool(BaseTool):
             base_dir: 基础目录
         """
         self.base_dir = os.path.abspath(base_dir)
-
-    def name(self) -> str:
-        """获取工具名称
-
-        Returns:
-            工具名称
-        """
-        return "write_file"
-
-    def description(self) -> str:
-        """获取工具描述
-
-        Returns:
-            工具描述
-        """
-        return "写入文件内容到指定路径。当你需要创建或修改文件时使用此工具。"
-
-    def parameters(self) -> dict[str, Any]:
-        """获取工具参数
-
-        Returns:
-            工具参数字典
-        """
-        return {
-            "file_path": {
-                "type": "string",
-                "description": "文件路径，相对于项目根目录",
-                "required": True,
-            },
-            "content": {
-                "type": "string",
-                "description": "要写入的文件内容",
-                "required": True,
-            },
-            "overwrite": {
-                "type": "boolean",
-                "description": "是否覆盖现有文件，默认为 True",
-                "required": False,
-            },
-        }
 
     def run(self, params: str) -> str:
         """运行工具

@@ -78,21 +78,42 @@ class BashTool(BaseTool):
                 )
 
             # 执行命令
-            result = subprocess.run(
-                validated_params.command,
-                shell=True,
-                cwd=full_cwd,
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
+            try:
+                result = subprocess.run(
+                    validated_params.command,
+                    shell=True,
+                    cwd=full_cwd,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    timeout=30,
+                )
+                stdout = result.stdout
+                stderr = result.stderr
+            except UnicodeDecodeError:
+                # UTF-8 解码失败，尝试使用系统默认编码
+                result = subprocess.run(
+                    validated_params.command,
+                    shell=True,
+                    cwd=full_cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                stdout = result.stdout
+                stderr = result.stderr
+            except Exception as e:
+                return json.dumps(
+                    {"success": False, "message": f"执行命令失败: {str(e)}"},
+                    ensure_ascii=False,
+                )
 
             return json.dumps(
                 {
                     "success": result.returncode == 0,
                     "returncode": result.returncode,
-                    "stdout": result.stdout,
-                    "stderr": result.stderr,
+                    "stdout": stdout,
+                    "stderr": stderr,
                 },
                 ensure_ascii=False,
             )

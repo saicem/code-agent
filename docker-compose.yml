@@ -1,3 +1,4 @@
+name: code-agent
 services:
   # Tempo runs as user 10001, and docker compose creates the volume as root.
   # As such, we need to chown the volume in order for Tempo to start correctly.
@@ -38,7 +39,9 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
+    command: [ "--config.file=/prometheus.yml" ]
     volumes:
+      - ./config/prometheus.yml:/prometheus.yml
       - prometheus-data:/prometheus
     ports:
       - "9090:9090"

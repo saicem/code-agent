@@ -5,7 +5,6 @@
 """
 
 import logging
-
 from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionUserMessageParam,
@@ -13,7 +12,6 @@ from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
     ChatCompletionMessageToolCallUnionParam,
 )
-
 import os
 import json
 from datetime import datetime

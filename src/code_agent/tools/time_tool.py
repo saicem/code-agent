@@ -6,7 +6,6 @@
 
 import json
 from datetime import datetime
-from typing import Any
 from pydantic import BaseModel, ValidationError
 from code_agent.tools.base_tool import BaseTool
 from code_agent.tools.tool_manager import ToolManager

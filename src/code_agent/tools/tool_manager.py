@@ -2,7 +2,9 @@
 """
 工具管理类
 """
+from code_agent.helpers.metrics import record_tool_call
 
+from code_agent.dependency import tracer
 from pydantic import BaseModel, TypeAdapter
 from typing import Iterable, Callable
 
@@ -86,6 +88,7 @@ class ToolManager:
         cls._tools_info[name] = tool_info
 
     @classmethod
+    @tracer.start_as_current_span("handle_tool_calls")
     def handle_tool_calls(
         cls, tool_calls: list[ChatCompletionMessageToolCallUnion]
     ) -> list[ChatCompletionToolMessageParam]:
@@ -104,17 +107,20 @@ class ToolManager:
         return result
 
     @classmethod
+    @tracer.start_as_current_span("handle_function_tool_call")
     def handle_function_tool_call(
         cls, tool_call: ChatCompletionMessageFunctionToolCall
     ) -> ChatCompletionToolMessageParam:
         """处理工具调用"""
         tool = cls.get_tool(tool_call.function.name)
         if tool is None:
+            record_tool_call(tool_call.function.name, 0.0, success=False)
             return {
                 "content": "工具不存在",
                 "role": "tool",
                 "tool_call_id": tool_call.id,
             }
+        record_tool_call(tool_call.function.name, 0.0, success=True)
         return {
             "content": tool.run(tool_call.function.arguments),
             "role": "tool",

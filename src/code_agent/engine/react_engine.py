@@ -11,13 +11,13 @@ from typing import List, Any
 from openai import AsyncOpenAI
 from opentelemetry import trace
 
-from code_agent.session import Session
-from code_agent.dependency import CONFIG
+from code_agent.core.session import Session
+from code_agent.core.di import container
 from code_agent.tools.tool_manager import (
     handle_function_tool_call,
     tools_for_model,
 )
-from code_agent.helpers.metrics import (
+from code_agent.monitoring.metrics import (
     record_model_call,
     record_tool_call,
     record_react_cycles,
@@ -38,6 +38,7 @@ class ReActEngine:
             client: 异步 OpenAI 客户端实例
         """
         self.client = client
+        self.config = container.config
 
     @tracer.start_as_current_span("react_loop")
     async def execute(self, session: Session) -> str:
@@ -49,10 +50,10 @@ class ReActEngine:
         Returns:
             执行结果
         """
-        logger.info(f"开始 ReAct 循环，最大循环次数: {CONFIG.react_max_cycles}")
+        logger.info(f"开始 ReAct 循环，最大循环次数: {self.config.react_max_cycles}")
 
         cycle_count = 0
-        while cycle_count < CONFIG.react_max_cycles:
+        while cycle_count < self.config.react_max_cycles:
             logger.debug(f"第 {cycle_count + 1} 次循环")
 
             # 异步调用模型
@@ -66,9 +67,9 @@ class ReActEngine:
 
         record_react_cycles(cycle_count)
 
-        if cycle_count >= CONFIG.react_max_cycles:
-            logger.warning(f"达到最大循环次数 {CONFIG.react_max_cycles}")
-            return f"执行异常: 达到最大循环次数 {CONFIG.react_max_cycles}"
+        if cycle_count >= self.config.react_max_cycles:
+            logger.warning(f"达到最大循环次数 {self.config.react_max_cycles}")
+            return f"执行异常: 达到最大循环次数 {self.config.react_max_cycles}"
         else:
             logger.info(f"任务完成，共执行 {cycle_count} 次循环")
             return "任务结束"
@@ -86,7 +87,7 @@ class ReActEngine:
         api_start_time = time.time()
 
         response = await self.client.chat.completions.create(
-            model=CONFIG.model,
+            model=self.config.model,
             messages=session.messages_for_model(),
             tools=tools_for_model(),
         )
@@ -113,7 +114,7 @@ class ReActEngine:
         usage = response.usage
         if usage:
             record_model_call(
-                model=CONFIG.model,
+                model=self.config.model,
                 duration=api_duration,
                 success=True,
                 total_tokens=usage.total_tokens,
@@ -121,7 +122,9 @@ class ReActEngine:
                 completion_tokens=usage.completion_tokens,
             )
         else:
-            record_model_call(model=CONFIG.model, duration=api_duration, success=True)
+            record_model_call(
+                model=self.config.model, duration=api_duration, success=True
+            )
 
         message = response.choices[0].message
 

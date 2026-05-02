@@ -3,23 +3,17 @@
 Code Agent 主入口文件
 """
 
-import asyncio
-from code_agent.helpers.otlp import init_otlp
-import logging
+from code_agent.core.session_manager import current_session
 
-
-import traceback
-from code_agent.prompt import system_prompt
-from code_agent.dependency import (
-    MEMORY_MANAGER,
-    SESSION_MANAGER,
-    COMMAND_HANDLER,
-    CONFIG,
-    CURRENT_SESSION,
-)
+from code_agent.engine.prompt import code_system_prompt
+from code_agent.monitoring.otlp import init_otlp
+from code_agent.core.di import container
 from code_agent.agent import CodeAgent
+import asyncio
+import logging
+import traceback
 
-file_handler = logging.FileHandler(CONFIG.log_file, encoding="utf-8")
+file_handler = logging.FileHandler(container.config.log_file, encoding="utf-8")
 file_handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 file_handler.setFormatter(formatter)
@@ -29,28 +23,28 @@ logger.setLevel(logging.DEBUG)
 
 
 async def main():
-    if CONFIG.otlp_enabled:
+    if container.config.otlp_enabled:
         init_otlp()
     logger.info("========== Code Agent 启动中 ==========")
     try:
         # 加载或创建会话
         logger.debug("加载最后会话...")
-        session = SESSION_MANAGER.load_last_session()
+        session = container.session_manager.load_last_session()
         if session:
             logger.info(f"已加载会话: {session.session_id}")
         else:
-            session = SESSION_MANAGER.create_session()
+            session = container.session_manager.create_session()
             logger.info(f"创建新会话: {session.session_id}")
-        CURRENT_SESSION.set(session)
+        current_session.set(session)
 
         # 初始化 Agent
         logger.debug("初始化 CodeAgent...")
-        agent = CodeAgent(CONFIG.api_key, CONFIG.base_url)
+        agent = CodeAgent(container.config.api_key, container.config.base_url)
         logger.info("Code Agent 初始化完成")
 
         print("\n" + "=" * 50)
         print("记忆摘要:")
-        print(MEMORY_MANAGER.get_summary())
+        print(container.memory_manager.get_summary())
         print("=" * 50 + "\n")
         print("请输入任务描述，输入 '/quit' 退出，输入 '/help' 查看可用指令")
 
@@ -62,13 +56,13 @@ async def main():
                 continue
 
             # 处理命令
-            if COMMAND_HANDLER.handle_command(task):
+            if container.command_handler.handle_command(task):
                 logger.debug(f"已处理命令: {task}")
                 continue
 
             # 执行任务
-            session = CURRENT_SESSION.get()
-            session.set_system_prompt(system_prompt)
+            session = current_session.get()
+            session.set_system_prompt(code_system_prompt)
             session.add_user_message(task)
 
             try:
@@ -83,7 +77,7 @@ async def main():
 
             # 保存会话
             logger.debug("保存会话...")
-            SESSION_MANAGER.save_session(session)
+            container.session_manager.save_session(session)
             logger.debug("会话保存成功")
 
     except Exception as e:

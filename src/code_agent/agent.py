@@ -4,18 +4,16 @@ Code Agent 类
 作为核心入口，协调会话管理和推理引擎
 """
 
+from code_agent.monitoring.metrics import record_task_start, record_task_completion
+from code_agent.engine.react_engine import ReActEngine
+from code_agent.core.session import Session
+
 import logging
 import time
 
 from openai import AsyncOpenAI
 from opentelemetry import trace
 
-from code_agent.session import Session
-from code_agent.react_engine import ReActEngine
-from code_agent.helpers.metrics import (
-    record_task_start,
-    record_task_completion,
-)
 
 tracer = trace.get_tracer("agent")
 logger = logging.getLogger(__name__)

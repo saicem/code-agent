@@ -1,4 +1,4 @@
-from code_agent.session import SessionManager
+from code_agent.core.session_manager import SessionManager, current_session
 
 
 def _show_session_help() -> None:
@@ -11,15 +11,13 @@ def _show_session_help() -> None:
 
 
 def _handle_session_list(session_manager: SessionManager) -> None:
-    from code_agent.dependency import CURRENT_SESSION
-
     sessions = session_manager.get_session_list()
     if not sessions:
         print("\n没有找到任何会话")
         return
 
     print("\n会话列表:")
-    current_id = CURRENT_SESSION.get().session_id
+    current_id = current_session.get().session_id
     for i, session in enumerate(sessions, 1):
         marker = "*" if session["id"] == current_id else " "
         created = session.get("created_at", "")[:19].replace("T", " ")
@@ -31,48 +29,40 @@ def _handle_session_list(session_manager: SessionManager) -> None:
 
 
 def _handle_session_switch(session_manager: SessionManager, session_id: str) -> None:
-    from code_agent.dependency import CURRENT_SESSION
-
     session = session_manager.load_session(session_id)
     if session:
-        CURRENT_SESSION.set(session)
+        current_session.set(session)
         print(f"\n已切换到会话: {session_id}")
     else:
         print(f"\n错误: 无法找到会话 {session_id}")
 
 
 def _handle_session_new(session_manager: SessionManager) -> None:
-    from code_agent.dependency import CURRENT_SESSION
-
     session = session_manager.create_session()
-    CURRENT_SESSION.set(session)
+    current_session.set(session)
     print(f"\n已创建新会话: {session.session_id}")
 
 
 def _handle_session_delete(session_manager: SessionManager, session_id: str) -> None:
-    from code_agent.dependency import CURRENT_SESSION
-
     if session_manager.delete_session(session_id):
         print(f"\n已删除会话: {session_id}")
-        if CURRENT_SESSION.get().session_id == session_id:
+        if current_session.get().session_id == session_id:
             session = session_manager.create_session()
-            CURRENT_SESSION.set(session)
+            current_session.set(session)
             print(f"已创建新会话: {session.session_id}")
     else:
         print(f"\n错误: 无法找到会话 {session_id}")
 
 
 def _handle_session_info(session_manager: SessionManager) -> None:
-    from code_agent.dependency import CURRENT_SESSION
-
     print("\n当前会话信息:")
-    print(CURRENT_SESSION.get().get_summary())
+    print(current_session.get().get_summary())
 
 
 def _handle_session(command: str) -> None:
-    from code_agent.dependency import SESSION_MANAGER
+    from code_agent.core.di import container
 
-    session_manager = SESSION_MANAGER
+    session_manager = container.session_manager
     if not session_manager:
         print("\n错误: 会话管理器未初始化")
         return

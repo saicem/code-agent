@@ -5,7 +5,7 @@
 """
 
 from typing import Any
-from code_agent.config import Config
+from code_agent.core.config import Config
 
 import os
 from datetime import datetime

@@ -9,8 +9,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
 
-from code_agent.helpers.metrics import record_tool_call
-from code_agent.dependency import tracer
+from code_agent.monitoring.metrics import record_tool_call
+from code_agent.core.di import container
 from pydantic import BaseModel, TypeAdapter
 
 from openai.types.chat import (
@@ -88,25 +88,26 @@ def _build_tool_info(
     }
 
 
-@tracer.start_as_current_span("handle_tool_calls")
+@container.tracer.start_as_current_span("handle_tool_calls")
 async def handle_tool_calls(
     tool_calls: list[ChatCompletionMessageToolCallUnion],
 ) -> list[ChatCompletionToolMessageParam]:
+    from typing import cast
+
     result: list[ChatCompletionToolMessageParam] = []
     for tool_call in tool_calls:
         if tool_call.type == "custom":
             continue
-        result.append(
-            await handle_function_tool_call(tool_call)  # ty:ignore[invalid-argument-type]
-        )
+        func_call = cast(ChatCompletionMessageFunctionToolCall, tool_call)
+        result.append(await handle_function_tool_call(func_call))
     return result
 
 
-@tracer.start_as_current_span("handle_function_tool_call")
+@container.tracer.start_as_current_span("handle_function_tool_call")
 async def handle_function_tool_call(
     tool_call: ChatCompletionMessageFunctionToolCall,
 ) -> ChatCompletionToolMessageParam:
-    """处理工具调用（异步版本）"""
+    """处理工具调用"""
     from opentelemetry import trace
 
     current_span = trace.get_current_span()

@@ -4,11 +4,17 @@
 用于精确替换部分文件内容
 """
 
+from code_agent.utils.tool_util import (
+    build_tool_response,
+    build_full_path,
+    validate_params,
+)
+
 import os
-import json
-from pydantic import BaseModel, Field, ValidationError
-from code_agent.tools.base_tool import BaseTool
-from code_agent.tools.tool_manager import ToolManager
+import asyncio
+from pydantic import BaseModel, Field
+from code_agent.tools.tool_manager import register_tool
+from code_agent.core.exceptions import ToolException
 
 
 class EditParams(BaseModel):
@@ -19,101 +25,58 @@ class EditParams(BaseModel):
     new_string: str = Field(..., description="要替换的新字符串")
 
 
-@ToolManager.register_tool(
-    name="edit_file", description="精确替换文件中的部分内容", param_type=EditParams
+@register_tool(
+    name="edit_file",
+    description="精确替换文件中的部分内容",
+    param_type=EditParams,
 )
-class EditTool(BaseTool):
-    """文件编辑工具"""
+async def edit_file(params: str) -> str:
+    """编辑文件
 
-    def __init__(self, base_dir: str = "."):
-        """初始化编辑工具
+    Args:
+        params: JSON 格式的参数字符串
 
-        Args:
-            base_dir: 基础目录
-        """
-        self.base_dir = os.path.abspath(base_dir)
+    Returns:
+        JSON 格式的结果字符串
+    """
+    try:
+        # 使用统一工具函数校验参数
+        validated_params = validate_params(params, EditParams)
+        full_path = build_full_path(validated_params.file_path)
 
-    def run(self, params: str) -> str:
-        """运行工具
-
-        Args:
-            params: JSON 格式的参数字符串
-
-        Returns:
-            JSON 格式的结果字符串
-        """
-        try:
-            # 使用 Pydantic 验证参数
-            try:
-                validated_params = EditParams.model_validate_json(params)
-            except ValidationError as e:
-                return json.dumps(
-                    {"success": False, "message": f"参数验证失败: {str(e)}"},
-                    ensure_ascii=False,
-                )
-
-            # 构建完整路径
-            full_path = os.path.join(self.base_dir, validated_params.file_path)
-            full_path = os.path.abspath(full_path)
-
-            # 检查路径是否在基础目录内
-            if not full_path.startswith(self.base_dir):
-                return json.dumps(
-                    {
-                        "success": False,
-                        "message": f"文件路径超出基础目录范围: {validated_params.file_path}",
-                    },
-                    ensure_ascii=False,
-                )
-
-            # 检查文件是否存在
-            if not os.path.exists(full_path):
-                return json.dumps(
-                    {
-                        "success": False,
-                        "message": f"文件不存在: {validated_params.file_path}",
-                    },
-                    ensure_ascii=False,
-                )
-
-            # 读取文件内容
-            with open(full_path, "r", encoding="utf-8") as f:
-                content = f.read()
-
-            # 检查旧字符串是否存在
-            if validated_params.old_string not in content:
-                return json.dumps(
-                    {
-                        "success": False,
-                        "message": f"文件中未找到要替换的内容: {validated_params.old_string}",
-                    },
-                    ensure_ascii=False,
-                )
-
-            # 替换内容
-            new_content = content.replace(
-                validated_params.old_string, validated_params.new_string
+        # 检查文件是否存在
+        if not os.path.exists(full_path):
+            return build_tool_response(
+                False,
+                f"文件不存在: {validated_params.file_path}",
             )
 
-            # 写入文件
-            with open(full_path, "w", encoding="utf-8") as f:
-                f.write(new_content)
+        # 异步读取文件内容
+        content = await asyncio.to_thread(
+            lambda: open(full_path, "r", encoding="utf-8").read()
+        )
 
-            return json.dumps(
-                {
-                    "success": True,
-                    "message": f"文件编辑成功: {validated_params.file_path}",
-                },
-                ensure_ascii=False,
+        # 检查旧字符串是否存在
+        if validated_params.old_string not in content:
+            return build_tool_response(
+                False,
+                "文件中未找到要替换的内容",
             )
 
-        except json.JSONDecodeError as e:
-            return json.dumps(
-                {"success": False, "message": f"JSON 解析失败: {str(e)}"},
-                ensure_ascii=False,
-            )
-        except Exception as e:
-            return json.dumps(
-                {"success": False, "message": f"编辑文件失败: {str(e)}"},
-                ensure_ascii=False,
-            )
+        # 替换内容
+        new_content = content.replace(
+            validated_params.old_string,
+            validated_params.new_string,
+        )
+
+        # 异步写入文件
+        await asyncio.to_thread(
+            lambda: open(full_path, "w", encoding="utf-8").write(new_content)
+        )
+
+        return build_tool_response(True, "文件编辑成功")
+
+    except ToolException as e:
+        return build_tool_response(False, str(e))
+    except Exception as e:
+        return build_tool_response(False, f"编辑文件失败: {str(e)}")

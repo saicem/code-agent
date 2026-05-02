@@ -3,12 +3,18 @@
 按内容搜索文件工具
 """
 
+from code_agent.utils.tool_util import (
+    build_tool_response,
+    build_full_path,
+    validate_params,
+)
+
 import os
 import re
-import json
-from pydantic import BaseModel, Field, ValidationError
-from code_agent.tools.base_tool import BaseTool
-from code_agent.tools.tool_manager import ToolManager
+import asyncio
+from pydantic import BaseModel, Field
+from code_agent.tools.tool_manager import register_tool
+from code_agent.core.exceptions import ToolException
 
 
 class GrepParams(BaseModel):
@@ -19,126 +25,87 @@ class GrepParams(BaseModel):
     file_pattern: str = Field("*", description="文件匹配模式，默认为所有文件")
 
 
-@ToolManager.register_tool(
+def _match_file_pattern(file: str, pattern: str) -> bool:
+    """检查文件是否匹配模式"""
+    if "*" in pattern:
+        regex_pattern = pattern.replace("*", ".*")
+        return bool(re.match(regex_pattern, file))
+    return file == pattern
+
+
+def _do_search(full_path: str, pattern: str, file_pattern: str) -> list[dict]:
+    """执行内容搜索"""
+    regex = re.compile(pattern)
+    results = []
+    base_dir = os.path.abspath(os.getcwd())
+
+    for root, dirs, files in os.walk(full_path):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+
+        for file in files:
+            if not _match_file_pattern(file, file_pattern):
+                continue
+
+            file_path = os.path.join(root, file)
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                    for line_num, line in enumerate(lines, 1):
+                        if regex.search(line):
+                            results.append(
+                                {
+                                    "file": os.path.relpath(file_path, base_dir),
+                                    "line": line_num,
+                                    "content": line.strip(),
+                                }
+                            )
+            except Exception:
+                pass
+
+    return results
+
+
+@register_tool(
     name="search_content",
     description="按内容搜索文件",
     param_type=GrepParams,
 )
-class GrepTool(BaseTool):
-    """内容搜索工具"""
+async def search_content(params: str) -> str:
+    """搜索内容
 
-    def __init__(self, base_dir: str = "."):
-        """初始化内容搜索工具
+    Args:
+        params: JSON 格式的参数字符串
 
-        Args:
-            base_dir: 基础目录
-        """
-        self.base_dir = os.path.abspath(base_dir)
+    Returns:
+        JSON 格式的结果字符串
+    """
+    try:
+        # 使用统一工具函数校验参数
+        validated_params = validate_params(params, GrepParams)
+        full_path = build_full_path(validated_params.path or ".")
 
-    def run(self, params: str) -> str:
-        """运行工具
-
-        Args:
-            params: JSON 格式的参数字符串
-
-        Returns:
-            JSON 格式的结果字符串
-        """
-        try:
-            # 使用 Pydantic 验证参数
-            try:
-                validated_params = GrepParams.model_validate_json(params)
-            except ValidationError as e:
-                return json.dumps(
-                    {"success": False, "message": f"参数验证失败: {str(e)}"},
-                    ensure_ascii=False,
-                )
-
-            # 构建完整路径
-            if validated_params.path:
-                full_path = os.path.join(self.base_dir, validated_params.path)
-                full_path = os.path.abspath(full_path)
-
-                # 检查路径是否在基础目录内
-                if not full_path.startswith(self.base_dir):
-                    return json.dumps(
-                        {
-                            "success": False,
-                            "message": f"搜索路径超出基础目录范围: {validated_params.path}",
-                        },
-                        ensure_ascii=False,
-                    )
-            else:
-                full_path = self.base_dir
-
-            # 检查目录是否存在
-            if not os.path.exists(full_path):
-                return json.dumps(
-                    {"success": False, "message": f"搜索路径不存在: {full_path}"},
-                    ensure_ascii=False,
-                )
-
-            # 编译正则表达式
-            regex = re.compile(validated_params.pattern)
-
-            # 执行搜索
-            results = []
-            for root, dirs, files in os.walk(full_path):
-                # 过滤目录
-                dirs[:] = [d for d in dirs if not d.startswith(".")]
-
-                for file in files:
-                    # 检查文件是否匹配模式
-                    if not self._match_file_pattern(
-                        file, validated_params.file_pattern
-                    ):
-                        continue
-
-                    file_path = os.path.join(root, file)
-                    try:
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            lines = f.readlines()
-                            for line_num, line in enumerate(lines, 1):
-                                if regex.search(line):
-                                    results.append(
-                                        {
-                                            "file": os.path.relpath(
-                                                file_path, self.base_dir
-                                            ),
-                                            "line": line_num,
-                                            "content": line.strip(),
-                                        }
-                                    )
-                    except Exception:
-                        # 跳过无法读取的文件
-                        pass
-
-            return json.dumps({"success": True, "results": results}, ensure_ascii=False)
-
-        except json.JSONDecodeError as e:
-            return json.dumps(
-                {"success": False, "message": f"JSON 解析失败: {str(e)}"},
-                ensure_ascii=False,
-            )
-        except Exception as e:
-            return json.dumps(
-                {"success": False, "message": f"搜索内容失败: {str(e)}"},
-                ensure_ascii=False,
+        # 检查目录是否存在
+        if not os.path.exists(full_path):
+            return build_tool_response(
+                False,
+                f"搜索路径不存在: {full_path}",
             )
 
-    def _match_file_pattern(self, file: str, pattern: str) -> bool:
-        """检查文件是否匹配模式
+        # 异步执行搜索
+        results = await asyncio.to_thread(
+            _do_search,
+            full_path,
+            validated_params.pattern,
+            validated_params.file_pattern,
+        )
 
-        Args:
-            file: 文件名
-            pattern: 文件匹配模式
+        return build_tool_response(
+            True,
+            "搜索完成",
+            data={"results": results},
+        )
 
-        Returns:
-            是否匹配
-        """
-        # 简单的通配符匹配
-        if "*" in pattern:
-            # 转换为正则表达式
-            regex_pattern = pattern.replace("*", ".*")
-            return bool(re.match(regex_pattern, file))
-        return file == pattern
+    except ToolException as e:
+        return build_tool_response(False, str(e))
+    except Exception as e:
+        return build_tool_response(False, f"搜索内容失败: {str(e)}")

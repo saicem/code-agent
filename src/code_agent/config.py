@@ -6,7 +6,7 @@
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from os.path import join
+from os.path import join, abspath
 from os import makedirs
 
 
@@ -27,7 +27,7 @@ class Config(BaseSettings):
     # 基础配置
     base_dir: str = Field(default=".", description="基础目录")
     storage_dir: str = Field(
-        default_factory=lambda data: join(data["base_dir"], ".memo"),
+        default_factory=lambda data: abspath(join(data["base_dir"], ".memo")),
         description="存储目录",
     )
 

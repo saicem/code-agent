@@ -4,10 +4,14 @@
 使用 DuckDuckGo 搜索
 """
 
-import json
-from pydantic import BaseModel, Field, ValidationError
-from code_agent.tools.base_tool import BaseTool
-from code_agent.tools.tool_manager import ToolManager
+from code_agent.utils.tool_util import (
+    build_tool_response,
+    validate_params,
+)
+
+from pydantic import BaseModel, Field
+from code_agent.tools.tool_manager import register_tool
+from code_agent.core.exceptions import ToolException
 
 from ddgs import DDGS
 
@@ -19,75 +23,57 @@ class SearchParams(BaseModel):
     limit: int = Field(3, description="返回结果数量，默认为 3")
 
 
-@ToolManager.register_tool(
+@register_tool(
     name="search_web",
     description="搜索网络内容。当你需要获取最新信息或外部知识时使用此工具。",
     param_type=SearchParams,
 )
-class SearchTool(BaseTool):
-    """网络搜索工具"""
+async def search_web(params: str) -> str:
+    """搜索网络内容
 
-    def run(self, params: str) -> str:
-        """运行工具
+    Args:
+        params: JSON 格式的参数字符串
 
-        Args:
-            params: JSON 格式的参数字符串
+    Returns:
+        JSON 格式的结果字符串
+    """
+    try:
+        # 使用统一工具函数校验参数
+        validated_params = validate_params(params, SearchParams)
 
-        Returns:
-            JSON 格式的结果字符串
-        """
         try:
-            # 使用 Pydantic 验证参数
-            try:
-                validated_params = SearchParams.model_validate_json(params)
-            except ValidationError as e:
-                return json.dumps(
-                    {"success": False, "message": f"参数验证失败: {str(e)}"},
-                    ensure_ascii=False,
-                )
+            # 使用 DuckDuckGo 搜索
+            with DDGS() as ddgs:
+                results = []
+                for result in ddgs.text(
+                    validated_params.query,
+                    max_results=validated_params.limit,
+                ):
+                    results.append(
+                        {
+                            "title": result.get("title"),
+                            "link": result.get("href"),
+                            "snippet": result.get("body"),
+                        }
+                    )
 
-            try:
-                # 使用 DuckDuckGo 搜索
-                with DDGS() as ddgs:
-                    results = []
-                    for result in ddgs.text(
-                        validated_params.query,
-                        max_results=validated_params.limit,
-                    ):
-                        results.append(
-                            {
-                                "title": result.get("title"),
-                                "link": result.get("href"),
-                                "snippet": result.get("body"),
-                            }
-                        )
-
-                return json.dumps(
-                    {
-                        "success": True,
-                        "results": results,
-                        "query": validated_params.query,
-                    },
-                    ensure_ascii=False,
-                )
-            except Exception as e:
-                # 如果搜索失败，返回错误信息
-                return json.dumps(
-                    {
-                        "success": False,
-                        "message": f"搜索失败: {str(e)}",
-                        "query": validated_params.query,
-                    },
-                    ensure_ascii=False,
-                )
-
-        except json.JSONDecodeError as e:
-            return json.dumps(
-                {"success": False, "message": f"JSON 解析失败: {str(e)}"},
-                ensure_ascii=False,
+            return build_tool_response(
+                True,
+                "搜索完成",
+                data={
+                    "results": results,
+                    "query": validated_params.query,
+                },
             )
         except Exception as e:
-            return json.dumps(
-                {"success": False, "message": f"搜索失败: {str(e)}"},
-                ensure_ascii=False,
+            # 如果搜索失败，返回错误信息
+            return build_tool_response(
+                False,
+                f"搜索失败: {str(e)}",
+                data={"query": validated_params.query},
             )
+
+    except ToolException as e:
+        return build_tool_response(False, str(e))
+    except Exception as e:
+        return build_tool_response(False, f"搜索失败: {str(e)}")

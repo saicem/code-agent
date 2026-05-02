@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """
-工具管理类
+工具管理模块
+支持异步工具调用
 """
-from code_agent.helpers.metrics import record_tool_call
 
+import asyncio
+import time
+from dataclasses import dataclass
+from typing import Any, Callable, Iterable
+
+from code_agent.helpers.metrics import record_tool_call
 from code_agent.dependency import tracer
 from pydantic import BaseModel, TypeAdapter
-from typing import Iterable, Callable
 
 from openai.types.chat import (
     ChatCompletionToolUnionParam,
@@ -15,114 +20,135 @@ from openai.types.chat import (
     ChatCompletionMessageFunctionToolCall,
     ChatCompletionToolMessageParam,
 )
-from code_agent.tools.base_tool import BaseTool
 
 
-class ToolManager:
-    """工具管理类"""
+@dataclass
+class ToolInfo:
+    """工具信息"""
 
-    # 存储所有注册的工具类
-    _registered_tools: dict[str, BaseTool] = {}
-    _tools_info: dict[str, ChatCompletionToolUnionParam] = {}
+    func: Callable[..., Any]
+    is_async: bool
 
-    @classmethod
-    def register_tool(
-        cls, name: str, description: str, param_type: type[BaseModel]
-    ) -> Callable[[type[BaseTool]], type[BaseTool]]:
-        """注册工具装饰器
 
-        Args:
-            name: 工具名称
-            description: 工具描述
-            param_type: 工具参数模型类
+_registered_tools: dict[str, ToolInfo] = {}
+_tools_info: dict[str, ChatCompletionToolUnionParam] = {}
 
-        Returns:
-            工具类装饰器
-        """
 
-        def wrapper(tool_class: type[BaseTool]) -> type[BaseTool]:
-            tool = tool_class()
-            cls._registered_tools[name] = tool
-            cls._build_tool_info(name, description, param_type)
-            return tool_class
+def register_tool(
+    name: str, description: str, param_type: type[BaseModel]
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def wrapper(func: Callable[..., Any]) -> Callable[..., Any]:
+        is_async = asyncio.iscoroutinefunction(func)
+        _registered_tools[name] = ToolInfo(
+            func=func,
+            is_async=is_async,
+        )
+        _tools_info[name] = _build_tool_info(name, description, param_type)
+        return func
 
-        return wrapper
+    return wrapper
 
-    @classmethod
-    def get_tool(cls, tool_name: str) -> BaseTool | None:
-        """获取工具实例
 
-        Args:
-            tool_name: 工具名称
+def get_tool(tool_name: str) -> ToolInfo | None:
+    """获取工具信息
 
-        Returns:
-            工具类或 None
-        """
-        return cls._registered_tools.get(tool_name)
+    Args:
+        tool_name: 工具名称
 
-    @classmethod
-    def tools_for_model(cls) -> Iterable[ChatCompletionToolUnionParam]:
-        """获取所有注册的工具实例
+    Returns:
+        工具信息或 None
+    """
+    return _registered_tools.get(tool_name)
 
-        Returns:
-            工具实例列表
-        """
-        return cls._tools_info.values()
 
-    @classmethod
-    def _build_tool_info(cls, name: str, description: str, param_type: type[BaseModel]):
-        """构建工具信息
+def tools_for_model() -> Iterable[ChatCompletionToolUnionParam]:
+    """获取所有注册的工具信息
 
-        Returns:
-            工具信息列表
-        """
+    Returns:
+        工具信息列表
+    """
+    return _tools_info.values()
 
-        tool_info: ChatCompletionFunctionToolParam = {
-            "type": "function",
-            "function": {
-                "name": name,
-                "description": description,
-                "parameters": TypeAdapter(param_type).json_schema(mode="serialization"),
-            },
+
+def _build_tool_info(
+    name: str, description: str, param_type: type[BaseModel]
+) -> ChatCompletionFunctionToolParam:
+    """构建工具信息
+
+    Returns:
+        工具信息列表
+    """
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": TypeAdapter(param_type).json_schema(mode="serialization"),
+        },
+    }
+
+
+@tracer.start_as_current_span("handle_tool_calls")
+async def handle_tool_calls(
+    tool_calls: list[ChatCompletionMessageToolCallUnion],
+) -> list[ChatCompletionToolMessageParam]:
+    result: list[ChatCompletionToolMessageParam] = []
+    for tool_call in tool_calls:
+        if tool_call.type == "custom":
+            continue
+        result.append(
+            await handle_function_tool_call(tool_call)  # ty:ignore[invalid-argument-type]
+        )
+    return result
+
+
+@tracer.start_as_current_span("handle_function_tool_call")
+async def handle_function_tool_call(
+    tool_call: ChatCompletionMessageFunctionToolCall,
+) -> ChatCompletionToolMessageParam:
+    """处理工具调用（异步版本）"""
+    from opentelemetry import trace
+
+    current_span = trace.get_current_span()
+    tool_name = tool_call.function.name
+    current_span.set_attributes(
+        {
+            "tool.name": tool_name,
+            "tool.call_id": tool_call.id,
+            "tool.arguments": tool_call.function.arguments,
         }
-        cls._tools_info[name] = tool_info
+    )
 
-    @classmethod
-    @tracer.start_as_current_span("handle_tool_calls")
-    def handle_tool_calls(
-        cls, tool_calls: list[ChatCompletionMessageToolCallUnion]
-    ) -> list[ChatCompletionToolMessageParam]:
-        """处理工具调用
-
-        Args:
-            tool_calls: 工具调用列表
-        """
-        result: list[ChatCompletionToolMessageParam] = []
-        for tool_call in tool_calls:
-            if tool_call.type == "custom":
-                continue
-            result.append(
-                cls.handle_function_tool_call(tool_call)  # ty:ignore[invalid-argument-type]
-            )
-        return result
-
-    @classmethod
-    @tracer.start_as_current_span("handle_function_tool_call")
-    def handle_function_tool_call(
-        cls, tool_call: ChatCompletionMessageFunctionToolCall
-    ) -> ChatCompletionToolMessageParam:
-        """处理工具调用"""
-        tool = cls.get_tool(tool_call.function.name)
-        if tool is None:
-            record_tool_call(tool_call.function.name, 0.0, success=False)
-            return {
-                "content": "工具不存在",
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-            }
-        record_tool_call(tool_call.function.name, 0.0, success=True)
+    tool_info = get_tool(tool_name)
+    if tool_info is None:
+        current_span.set_attribute("tool.success", False)
+        current_span.set_attribute("tool.error", "工具不存在")
+        record_tool_call(tool_name, 0.0, success=False)
         return {
-            "content": tool.run(tool_call.function.arguments),
+            "content": "工具不存在",
             "role": "tool",
             "tool_call_id": tool_call.id,
         }
+
+    tool_start_time = time.time()
+
+    try:
+        if tool_info.is_async:
+            content = await tool_info.func(tool_call.function.arguments)
+        else:
+            content = tool_info.func(tool_call.function.arguments)
+        current_span.set_attribute("tool.success", True)
+        tool_duration = time.time() - tool_start_time
+        record_tool_call(tool_name, tool_duration, success=True)
+    except Exception as e:
+        current_span.set_attribute("tool.success", False)
+        current_span.set_attribute("tool.error", str(e))
+        tool_duration = time.time() - tool_start_time
+        record_tool_call(tool_name, tool_duration, success=False)
+        raise
+
+    return {
+        "content": content,
+        "role": "tool",
+        "tool_call_id": tool_call.id,
+    }

@@ -3,6 +3,7 @@
 Code Agent 主入口文件
 """
 
+import asyncio
 from code_agent.helpers.otlp import init_otlp
 import logging
 
@@ -27,7 +28,7 @@ logger.addHandler(file_handler)
 logger.setLevel(logging.DEBUG)
 
 
-def main():
+async def main():
     if CONFIG.otlp_enabled:
         init_otlp()
     logger.info("========== Code Agent 启动中 ==========")
@@ -72,7 +73,7 @@ def main():
 
             try:
                 logger.debug(f"开始执行任务: {task[:50]}...")
-                result = agent.execute_task(session)
+                result = await agent.execute_task(session)
                 logger.info("任务执行成功")
                 print(f"\n结果:\n{result}")
             except Exception as e:
@@ -92,4 +93,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

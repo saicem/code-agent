@@ -1,0 +1,36 @@
+# 忽略开发/构建无关文件
+.git
+.gitignore
+README.md
+AGENTS.md
+LICENSE
+pyproject.toml
+uv.lock
+uv.toml
+Dockerfile
+docker-compose.yml
+Makefile
+.ruff_cache
+.mypy_cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.env.local
+.env.production
+*.log
+*.tmp
+*.swp
+*.swo
+# 忽略测试和文档
+test/
+tests/
+docs/
+doc/
+# 忽略 IDE/Editor 文件
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace

@@ -3,12 +3,16 @@
 终端命令执行工具
 """
 
+from code_agent.utils.tool_util import (
+    build_tool_response,
+    build_full_path,
+    validate_params,
+)
+
 import os
-import subprocess
-import json
-from pydantic import BaseModel, Field, ValidationError
-from code_agent.tools.base_tool import BaseTool
-from code_agent.tools.tool_manager import ToolManager
+import asyncio
+from pydantic import BaseModel, Field
+from code_agent.tools.tool_manager import register_tool
 
 
 class BashParams(BaseModel):
@@ -18,113 +22,59 @@ class BashParams(BaseModel):
     cwd: str | None = Field(None, description="命令执行的工作目录，默认为基础目录")
 
 
-@ToolManager.register_tool(
+@register_tool(
     name="run_bash",
     description="执行终端命令，例如删除文件、移动文件、查看目录结构等",
     param_type=BashParams,
 )
-class BashTool(BaseTool):
-    """终端命令工具"""
+async def run_bash(params: str) -> str:
+    """执行终端命令
 
-    def __init__(self, base_dir: str = "."):
-        """初始化终端命令工具
+    Args:
+        params: JSON 格式的参数字符串
 
-        Args:
-            base_dir: 基础目录
-        """
-        self.base_dir = os.path.abspath(base_dir)
+    Returns:
+        JSON 格式的结果字符串
+    """
+    try:
+        # 使用统一工具函数校验参数
+        validated_params = validate_params(params, BashParams)
+        full_cwd = build_full_path(validated_params.cwd or ".")
 
-    def run(self, params: str) -> str:
-        """运行工具
+        # 检查目录是否存在
+        if not os.path.exists(full_cwd):
+            return build_tool_response(False, f"工作目录不存在: {full_cwd}")
 
-        Args:
-            params: JSON 格式的参数字符串
+        process = await asyncio.create_subprocess_shell(
+            validated_params.command,
+            cwd=full_cwd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
 
-        Returns:
-            JSON 格式的结果字符串
-        """
+        stdout_bytes, stderr_bytes = await asyncio.wait_for(
+            process.communicate(), timeout=30
+        )
+
+        # 尝试解码输出
         try:
-            # 使用 Pydantic 验证参数
-            try:
-                validated_params = BashParams.model_validate_json(params)
-            except ValidationError as e:
-                return json.dumps(
-                    {"success": False, "message": f"参数验证失败: {str(e)}"},
-                    ensure_ascii=False,
-                )
+            stdout = stdout_bytes.decode("utf-8")
+            stderr = stderr_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            stdout = stdout_bytes.decode()
+            stderr = stderr_bytes.decode()
 
-            # 构建完整路径
-            if validated_params.cwd:
-                full_cwd = os.path.join(self.base_dir, validated_params.cwd)
-                full_cwd = os.path.abspath(full_cwd)
+        return build_tool_response(
+            process.returncode == 0,
+            "命令执行成功" if process.returncode == 0 else "命令执行失败",
+            data={
+                "returncode": process.returncode,
+                "stdout": stdout,
+                "stderr": stderr,
+            },
+        )
 
-                # 检查路径是否在基础目录内
-                if not full_cwd.startswith(self.base_dir):
-                    return json.dumps(
-                        {
-                            "success": False,
-                            "message": f"工作目录超出基础目录范围: {validated_params.cwd}",
-                        },
-                        ensure_ascii=False,
-                    )
-            else:
-                full_cwd = self.base_dir
-
-            # 检查目录是否存在
-            if not os.path.exists(full_cwd):
-                return json.dumps(
-                    {"success": False, "message": f"工作目录不存在: {full_cwd}"},
-                    ensure_ascii=False,
-                )
-
-            # 执行命令
-            try:
-                result = subprocess.run(
-                    validated_params.command,
-                    shell=True,
-                    cwd=full_cwd,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    timeout=30,
-                )
-                stdout = result.stdout
-                stderr = result.stderr
-            except UnicodeDecodeError:
-                # UTF-8 解码失败，尝试使用系统默认编码
-                result = subprocess.run(
-                    validated_params.command,
-                    shell=True,
-                    cwd=full_cwd,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                )
-                stdout = result.stdout
-                stderr = result.stderr
-            except Exception as e:
-                return json.dumps(
-                    {"success": False, "message": f"执行命令失败: {str(e)}"},
-                    ensure_ascii=False,
-                )
-
-            return json.dumps(
-                {
-                    "success": result.returncode == 0,
-                    "returncode": result.returncode,
-                    "stdout": stdout,
-                    "stderr": stderr,
-                },
-                ensure_ascii=False,
-            )
-
-        except json.JSONDecodeError as e:
-            return json.dumps(
-                {"success": False, "message": f"JSON 解析失败: {str(e)}"},
-                ensure_ascii=False,
-            )
-        except Exception as e:
-            return json.dumps(
-                {"success": False, "message": f"执行命令失败: {str(e)}"},
-                ensure_ascii=False,
-            )
+    except asyncio.TimeoutError:
+        return build_tool_response(False, "命令执行超时")
+    except Exception as e:
+        return build_tool_response(False, f"执行命令失败: {str(e)}")

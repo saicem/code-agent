@@ -36,7 +36,7 @@ def init_otlp():
     logger_provider = LoggerProvider(resource=resource)
     logger_provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter()))
     set_logger_provider(logger_provider)
-    
+
     # 配置标准 logging 模块的 handler
     log_handler = LoggingHandler(level=logging.NOTSET, logger_provider=logger_provider)
     root_logger = logging.getLogger()

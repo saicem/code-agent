@@ -60,9 +60,7 @@ def _handle_session_info(session_manager: SessionManager) -> None:
 
 
 def _handle_session(command: str) -> None:
-    from code_agent.core.di import container
-
-    session_manager = container.session_manager
+    session_manager = _get_session_manager()
     if not session_manager:
         print("\n错误: 会话管理器未初始化")
         return
@@ -94,6 +92,12 @@ def _handle_session(command: str) -> None:
         _handle_session_info(session_manager)
     else:
         _show_session_help()
+
+
+def _get_session_manager() -> SessionManager:
+    from code_agent.core.di import container
+
+    return container.session_manager
 
 
 def register_session_commands(handler) -> None:

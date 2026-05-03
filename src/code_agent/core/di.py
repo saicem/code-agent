@@ -1,5 +1,4 @@
 from code_agent.core.session_manager import SessionManager
-from code_agent.utils.file_ignore import FileIgnoreManager
 from dataclasses import dataclass
 from code_agent.commands import CommandHandler
 from opentelemetry import trace
@@ -13,7 +12,6 @@ class Container:
     memory_manager: MemoryManager
     session_manager: SessionManager
     command_handler: CommandHandler
-    file_ignore_manager: FileIgnoreManager
     tracer: trace.Tracer
 
     @staticmethod
@@ -24,7 +22,6 @@ class Container:
             memory_manager=MemoryManager(config),
             session_manager=SessionManager(config.sessions_dir),
             command_handler=CommandHandler(),
-            file_ignore_manager=FileIgnoreManager(config.base_dir),
             tracer=trace.get_tracer("code_agent"),
         )
 

@@ -3,19 +3,19 @@
 Code Agent 主入口文件
 """
 
-from code_agent.core.config import get_config
 from code_agent import monitoring
+from code_agent.core.config import get_config
 
 if get_config().logging.otlp_enabled:
     monitoring.init()
 
-from code_agent.agent.engine import execute_reasoning_acting
-from code_agent.agent.gate import ModelGate
-from code_agent.agent import prompt
-from code_agent.core.session_manager import current_session
-from code_agent.core.di import container
 import asyncio
 
+from code_agent.agent import prompt
+from code_agent.agent.engine import execute_reasoning_acting
+from code_agent.agent.gate import ModelGate
+from code_agent.core.di import container
+from code_agent.core.session_manager import current_session
 
 _logger = monitoring.get_logger(__name__)
 _tracer = monitoring.get_tracer(__name__)

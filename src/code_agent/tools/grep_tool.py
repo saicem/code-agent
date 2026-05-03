@@ -3,18 +3,19 @@
 按内容搜索文件工具
 """
 
-from code_agent.utils.tool_util import (
-    build_tool_response,
-    build_full_path,
-    validate_params,
-)
-
+import asyncio
 import os
 import re
-import asyncio
+
 from pydantic import BaseModel, Field
-from code_agent.tools.tool_manager import register_tool
+
 from code_agent.core.exceptions import ToolException
+from code_agent.tools.tool_manager import register_tool
+from code_agent.utils.tool_util import (
+    build_full_path,
+    build_tool_response,
+    validate_params,
+)
 
 
 class GrepParams(BaseModel):
@@ -108,4 +109,4 @@ async def search_content(params: str) -> str:
     except ToolException as e:
         return build_tool_response(False, str(e))
     except Exception as e:
-        return build_tool_response(False, f"搜索内容失败: {str(e)}")
+        return build_tool_response(False, f"搜索内容失败: {e!s}")

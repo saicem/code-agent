@@ -1,9 +1,11 @@
-from code_agent.core.session_manager import SessionManager
 from dataclasses import dataclass
-from code_agent.commands import CommandHandler
+
 from opentelemetry import trace
+
+from code_agent.commands import CommandHandler
 from code_agent.core.config import get_config
 from code_agent.core.memory import MemoryManager
+from code_agent.core.session_manager import SessionManager
 
 
 @dataclass

@@ -4,10 +4,12 @@
 提供参数校验和路径构建等通用功能
 """
 
-import os
 import json
-from typing import Type, Any
+import os
+from typing import Any, Type
+
 from pydantic import BaseModel, ValidationError
+
 from code_agent.core.exceptions import ToolException
 
 
@@ -29,9 +31,9 @@ def validate_params[T: BaseModel](params: str, param_type: Type[T]) -> T:
         validated_params = param_type.model_validate_json(params)
         return validated_params
     except ValidationError as e:
-        raise ToolException(f"参数验证失败: {str(e)}")
+        raise ToolException(f"参数验证失败: {e!s}") from e
     except json.JSONDecodeError as e:
-        raise ToolException(f"JSON 解析失败: {str(e)}")
+        raise ToolException(f"JSON 解析失败: {e!s}") from e
 
 
 def build_full_path(file_path: str, base_dir: str | None = None) -> str:

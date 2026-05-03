@@ -4,11 +4,11 @@
 将配置项分组到不同的配置类中，便于不同模块精确传入所需配置
 """
 
-from pydantic import Field, BaseModel, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-from os.path import join, abspath
 from os import makedirs
+from os.path import abspath, join
+
+from pydantic import BaseModel, Field, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class GateConfig(BaseModel):
@@ -97,9 +97,7 @@ class Config(BaseSettings):
 
         # 上下文文件
         if not self.context.context_file:
-            self.context.context_file = join(
-                self.storage.storage_dir, "session_context.json"
-            )
+            self.context.context_file = join(self.storage.storage_dir, "session_context.json")
 
         # 日志文件
         if not self.logging.log_file:

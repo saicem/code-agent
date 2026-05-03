@@ -5,15 +5,16 @@
 """
 
 import logging
-from openai.types.chat import (
-    ChatCompletionMessageParam,
-    ChatCompletionUserMessageParam,
-    ChatCompletionToolMessageParam,
-    ChatCompletionAssistantMessageParam,
-    ChatCompletionMessageToolCallUnionParam,
-)
 from datetime import datetime
 from typing import Any
+
+from openai.types.chat import (
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionMessageParam,
+    ChatCompletionMessageToolCallUnionParam,
+    ChatCompletionToolMessageParam,
+    ChatCompletionUserMessageParam,
+)
 
 logger = logging.getLogger()
 
@@ -33,9 +34,7 @@ class Session:
         self.session_id = session_id
         self.created_at = datetime.now().isoformat()
         self.updated_at = datetime.now().isoformat()
-        self.messages: list[
-            ChatCompletionMessageParam
-        ] = []  # 主消息列表（用于发送给模型）
+        self.messages: list[ChatCompletionMessageParam] = []  # 主消息列表（用于发送给模型）
         self.history: list[ChatCompletionMessageParam] = []  # 历史记录（保留所有内容）
         self.system_prompt: str | None = None
 

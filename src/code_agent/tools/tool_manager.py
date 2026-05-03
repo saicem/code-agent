@@ -4,22 +4,23 @@
 支持异步工具调用
 """
 
-from code_agent import monitoring
 import asyncio
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
-from opentelemetry import trace
-from code_agent.core.di import container
-from pydantic import BaseModel, TypeAdapter
-from opentelemetry.trace.status import StatusCode
 
 from openai.types.chat import (
-    ChatCompletionToolUnionParam,
     ChatCompletionFunctionToolParam,
-    ChatCompletionMessageToolCallUnion,
     ChatCompletionMessageFunctionToolCall,
+    ChatCompletionMessageToolCallUnion,
     ChatCompletionToolMessageParam,
+    ChatCompletionToolUnionParam,
 )
+from opentelemetry import trace
+from opentelemetry.trace.status import StatusCode
+from pydantic import BaseModel, TypeAdapter
+
+from code_agent import monitoring
+from code_agent.core.di import container
 
 _logger = monitoring.get_logger(__name__)
 
@@ -46,7 +47,6 @@ def register_tool(
             is_async=is_async,
         )
         _tools_info[name] = _build_tool_info(name, description, param_type)
-        _logger
         return func
 
     return wrapper

@@ -1,12 +1,14 @@
-from openai import AsyncOpenAI, Omit, omit
-from code_agent.core.config import GateConfig
-from code_agent import monitoring
 from typing import Iterable
+
+from openai import AsyncOpenAI, Omit, omit
 from openai.types.chat import (
-    ChatCompletionToolUnionParam,
-    ChatCompletionMessageParam,
     ChatCompletion,
+    ChatCompletionMessageParam,
+    ChatCompletionToolUnionParam,
 )
+
+from code_agent import monitoring
+from code_agent.core.config import GateConfig
 
 _tracer = monitoring.get_tracer(__name__)
 _logger = monitoring.get_logger(__name__)

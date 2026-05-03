@@ -3,16 +3,17 @@
 终端命令执行工具
 """
 
+import asyncio
+import os
+
+from pydantic import BaseModel, Field
+
+from code_agent.tools.tool_manager import register_tool
 from code_agent.utils.tool_util import (
-    build_tool_response,
     build_full_path,
+    build_tool_response,
     validate_params,
 )
-
-import os
-import asyncio
-from pydantic import BaseModel, Field
-from code_agent.tools.tool_manager import register_tool
 
 
 class BashParams(BaseModel):
@@ -52,9 +53,7 @@ async def run_bash(params: str) -> str:
             stderr=asyncio.subprocess.PIPE,
         )
 
-        stdout_bytes, stderr_bytes = await asyncio.wait_for(
-            process.communicate(), timeout=30
-        )
+        stdout_bytes, stderr_bytes = await asyncio.wait_for(process.communicate(), timeout=30)
 
         # 尝试解码输出
         try:
@@ -77,4 +76,4 @@ async def run_bash(params: str) -> str:
     except asyncio.TimeoutError:
         return build_tool_response(False, "命令执行超时")
     except Exception as e:
-        return build_tool_response(False, f"执行命令失败: {str(e)}")
+        return build_tool_response(False, f"执行命令失败: {e!s}")

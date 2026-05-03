@@ -4,17 +4,18 @@
 用于精确替换部分文件内容
 """
 
+import asyncio
+import os
+
+from pydantic import BaseModel, Field
+
+from code_agent.core.exceptions import ToolException
+from code_agent.tools.tool_manager import register_tool
 from code_agent.utils.tool_util import (
-    build_tool_response,
     build_full_path,
+    build_tool_response,
     validate_params,
 )
-
-import os
-import asyncio
-from pydantic import BaseModel, Field
-from code_agent.tools.tool_manager import register_tool
-from code_agent.core.exceptions import ToolException
 
 
 class EditParams(BaseModel):
@@ -52,9 +53,7 @@ async def edit_file(params: str) -> str:
             )
 
         # 异步读取文件内容
-        content = await asyncio.to_thread(
-            lambda: open(full_path, "r", encoding="utf-8").read()
-        )
+        content = await asyncio.to_thread(lambda: open(full_path, "r", encoding="utf-8").read())
 
         # 检查旧字符串是否存在
         if validated_params.old_string not in content:
@@ -70,13 +69,11 @@ async def edit_file(params: str) -> str:
         )
 
         # 异步写入文件
-        await asyncio.to_thread(
-            lambda: open(full_path, "w", encoding="utf-8").write(new_content)
-        )
+        await asyncio.to_thread(lambda: open(full_path, "w", encoding="utf-8").write(new_content))
 
         return build_tool_response(True, "文件编辑成功")
 
     except ToolException as e:
         return build_tool_response(False, str(e))
     except Exception as e:
-        return build_tool_response(False, f"编辑文件失败: {str(e)}")
+        return build_tool_response(False, f"编辑文件失败: {e!s}")

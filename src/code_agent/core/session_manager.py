@@ -1,10 +1,11 @@
 import contextvars
-from code_agent.core.session import Session
+import json
 import logging
 import os
-import json
 from datetime import datetime
 from typing import Any
+
+from code_agent.core.session import Session
 
 logger = logging.getLogger()
 
@@ -134,9 +135,7 @@ class SessionManager:
                                 sessions = self.get_session_list()
                                 new_last = sessions[0]["id"] if sessions else None
 
-                                with open(
-                                    self.last_session_file, "w", encoding="utf-8"
-                                ) as f:
+                                with open(self.last_session_file, "w", encoding="utf-8") as f:
                                     json.dump({"last_session_id": new_last}, f)
                                 logger.debug(f"更新最后会话为: {new_last}")
                     except Exception as e:

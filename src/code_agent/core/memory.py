@@ -4,11 +4,11 @@
 合并用户上下文和项目上下文为"记忆"，存储在 .memo/memory.md
 """
 
-from typing import Any
-from code_agent.core.config import Config
-
 import os
 from datetime import datetime
+from typing import Any
+
+from code_agent.core.config import Config
 
 
 class MemoryManager:

@@ -4,15 +4,16 @@
 用于获取当前时间
 """
 
+from datetime import datetime
+
+from pydantic import BaseModel
+
+from code_agent.core.exceptions import ToolException
+from code_agent.tools.tool_manager import register_tool
 from code_agent.utils.tool_util import (
     build_tool_response,
     validate_params,
 )
-
-from datetime import datetime
-from pydantic import BaseModel
-from code_agent.tools.tool_manager import register_tool
-from code_agent.core.exceptions import ToolException
 
 
 class TimeParams(BaseModel):
@@ -54,4 +55,4 @@ async def get_current_time(params: str) -> str:
     except ToolException as e:
         return build_tool_response(False, str(e))
     except Exception as e:
-        return build_tool_response(False, f"获取时间失败: {str(e)}")
+        return build_tool_response(False, f"获取时间失败: {e!s}")

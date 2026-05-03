@@ -1,6 +1,9 @@
 from collections.abc import Callable
 from typing import Any
 
+from .session import register_session_commands
+from .system import register_system_commands
+
 
 class CommandHandler:
     def __init__(self):
@@ -8,15 +11,11 @@ class CommandHandler:
         self._register_default_commands()
 
     def _register_default_commands(self):
-        from .system import register_system_commands
-        from .session import register_session_commands
 
         register_system_commands(self)
         register_session_commands(self)
 
-    def register_command(
-        self, command: str, handler: Callable[[str], None], description: str
-    ):
+    def register_command(self, command: str, handler: Callable[[str], None], description: str):
         self.commands[command] = {"handler": handler, "description": description}
 
     def unregister_command(self, command: str):

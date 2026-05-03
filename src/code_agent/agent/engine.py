@@ -3,6 +3,7 @@
 思考引擎模块
 """
 
+from code_agent import monitoring
 from code_agent.agent.gate import ModelGate
 from code_agent.core.config import ReactConfig
 from code_agent.core.session import Session
@@ -10,17 +11,13 @@ from code_agent.tools.tool_manager import (
     handle_tool_calls,
     tools_for_model,
 )
-from code_agent import monitoring
-
 
 _tracer = monitoring.get_tracer("react_engine")
 _logger = monitoring.get_logger(__name__)
 
 
 @_tracer.start_as_current_span("react_loop")
-async def execute_reasoning_acting(
-    gate: ModelGate, session: Session, config: ReactConfig
-) -> None:
+async def execute_reasoning_acting(gate: ModelGate, session: Session, config: ReactConfig) -> None:
     _logger.info(f"开始 ReAct 循环，最大循环次数: {config.max_cycles}")
     cycle_count = 0
     while cycle_count < config.max_cycles:

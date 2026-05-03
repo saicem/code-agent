@@ -3,18 +3,19 @@
 按文件名模式搜索文件工具
 """
 
+import asyncio
+import glob
+import os
+
+from pydantic import BaseModel, Field
+
+from code_agent.core.exceptions import ToolException
+from code_agent.tools.tool_manager import register_tool
 from code_agent.utils.tool_util import (
-    build_tool_response,
     build_full_path,
+    build_tool_response,
     validate_params,
 )
-
-import os
-import glob
-import asyncio
-from pydantic import BaseModel, Field
-from code_agent.tools.tool_manager import register_tool
-from code_agent.core.exceptions import ToolException
 
 
 class GlobParams(BaseModel):
@@ -96,4 +97,4 @@ async def search_files(params: str) -> str:
     except ToolException as e:
         return build_tool_response(False, str(e))
     except Exception as e:
-        return build_tool_response(False, f"搜索文件失败: {str(e)}")
+        return build_tool_response(False, f"搜索文件失败: {e!s}")

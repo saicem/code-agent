@@ -4,16 +4,14 @@ OpenTelemetry 配置模块
 """
 
 import logging
-from opentelemetry.instrumentation.openai import OpenAIInstrumentor
-from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 
+from opentelemetry import _logs, trace
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.openai import OpenAIInstrumentor
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-
-from opentelemetry import trace
-from opentelemetry import _logs
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
@@ -37,15 +35,11 @@ def init_otlp():
 
     # 初始化 logger provider，确保与 trace 关联
     _logger_provider = LoggerProvider(resource=_resource)
-    _logger_provider.add_log_record_processor(
-        BatchLogRecordProcessor(OTLPLogExporter())
-    )
+    _logger_provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter()))
     _logs.set_logger_provider(_logger_provider)
 
     # 配置标准 logging 模块的 handler
-    _log_handler = LoggingHandler(
-        level=logging.NOTSET, logger_provider=_logger_provider
-    )
+    _log_handler = LoggingHandler(level=logging.NOTSET, logger_provider=_logger_provider)
 
     root_logger = logging.getLogger()
     root_logger.addHandler(_log_handler)

@@ -4,16 +4,15 @@
 使用 DuckDuckGo 搜索
 """
 
+from ddgs import DDGS
+from pydantic import BaseModel, Field
+
+from code_agent.core.exceptions import ToolException
+from code_agent.tools.tool_manager import register_tool
 from code_agent.utils.tool_util import (
     build_tool_response,
     validate_params,
 )
-
-from pydantic import BaseModel, Field
-from code_agent.tools.tool_manager import register_tool
-from code_agent.core.exceptions import ToolException
-
-from ddgs import DDGS
 
 
 class SearchParams(BaseModel):
@@ -69,11 +68,11 @@ async def search_web(params: str) -> str:
             # 如果搜索失败，返回错误信息
             return build_tool_response(
                 False,
-                f"搜索失败: {str(e)}",
+                f"搜索失败: {e!s}",
                 data={"query": validated_params.query},
             )
 
     except ToolException as e:
         return build_tool_response(False, str(e))
     except Exception as e:
-        return build_tool_response(False, f"搜索失败: {str(e)}")
+        return build_tool_response(False, f"搜索失败: {e!s}")

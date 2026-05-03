@@ -4,17 +4,17 @@
 用于写入文件内容
 """
 
+import os
+
+from pydantic import BaseModel, Field
+
+from code_agent.core.exceptions import ToolException
+from code_agent.tools.tool_manager import register_tool
 from code_agent.utils.tool_util import (
-    build_tool_response,
     build_full_path,
+    build_tool_response,
     validate_params,
 )
-
-import os
-import asyncio
-from pydantic import BaseModel, Field
-from code_agent.tools.tool_manager import register_tool
-from code_agent.core.exceptions import ToolException
 
 
 class WriteParams(BaseModel):
@@ -30,7 +30,7 @@ class WriteParams(BaseModel):
     description="写入文件内容到指定路径。当你需要创建或修改文件时使用此工具。",
     param_type=WriteParams,
 )
-async def write_file(params: str) -> str:
+def write_file(params: str) -> str:
     """写入文件
 
     Args:
@@ -56,11 +56,8 @@ async def write_file(params: str) -> str:
             )
 
         # 异步写入文件
-        await asyncio.to_thread(
-            lambda: open(full_path, "w", encoding="utf-8").write(
-                validated_params.content
-            )
-        )
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(validated_params.content)
 
         return build_tool_response(
             True,
@@ -71,4 +68,4 @@ async def write_file(params: str) -> str:
     except ToolException as e:
         return build_tool_response(False, str(e))
     except Exception as e:
-        return build_tool_response(False, f"写入文件失败: {str(e)}")
+        return build_tool_response(False, f"写入文件失败: {e!s}")

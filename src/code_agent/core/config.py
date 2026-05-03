@@ -109,3 +109,13 @@ class Config(BaseSettings):
         """确保必要的目录存在"""
         makedirs(self.storage.storage_dir, exist_ok=True)
         makedirs(self.storage.sessions_dir, exist_ok=True)
+
+
+_config: Config | None = None
+
+
+def get_config() -> Config:
+    global _config
+    if not _config:
+        _config = Config()
+    return _config

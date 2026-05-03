@@ -1,4 +1,3 @@
-from opentelemetry import trace
 from openai import AsyncOpenAI, Omit, omit
 from code_agent.core.config import GateConfig
 from code_agent import monitoring
@@ -21,7 +20,6 @@ class ModelGate:
         )
         self._model = model_config.model
 
-    @_tracer.start_as_current_span("call_model")
     async def call_model(
         self,
         messages: Iterable[ChatCompletionMessageParam],
@@ -32,10 +30,4 @@ class ModelGate:
             messages=messages,
             tools=tools,
         )
-        span = trace.get_current_span()
-        usage = result.usage
-        if usage:
-            span.set_attribute("total_tokens", usage.total_tokens)
-            span.set_attribute("prompt_tokens", usage.prompt_tokens)
-            span.set_attribute("completion_tokens", usage.completion_tokens)
         return result

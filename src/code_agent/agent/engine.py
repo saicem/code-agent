@@ -8,6 +8,7 @@ from code_agent.core.config import ReactConfig
 from code_agent.core.session import Session
 from code_agent.tools.tool_manager import (
     handle_tool_calls,
+    tools_for_model,
 )
 from code_agent import monitoring
 
@@ -26,7 +27,7 @@ async def execute_reasoning_acting(
         cycle_count += 1
         _logger.debug(f"第 {cycle_count + 1} 次循环")
 
-        response = await gate.call_model(session.messages)
+        response = await gate.call_model(session.messages, tools_for_model())
         message = response.choices[0].message
 
         # 处理助手消息

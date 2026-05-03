@@ -76,6 +76,8 @@ services:
     command: [ "--config=/etc/otel-collector/config.yml" ]
     volumes:
       - ./config/otelcol.yml:/etc/otel-collector/config.yml
+    ports:
+      - "4318:4318"
     networks:
       - observability
     depends_on:
@@ -85,7 +87,6 @@ services:
 
 volumes:
   tempo-data:
-  loki-data:
   prometheus-data:
   grafana-data:
 

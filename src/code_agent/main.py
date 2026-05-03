@@ -3,24 +3,27 @@
 Code Agent 主入口文件
 """
 
-from code_agent.agent.engine import execute_reasoning_acting
+from code_agent.core.config import get_config
+from code_agent import monitoring
 
+if get_config().logging.otlp_enabled:
+    monitoring.init()
+
+from code_agent.agent.engine import execute_reasoning_acting
 from code_agent.agent.gate import ModelGate
 from code_agent.agent import prompt
 from code_agent.core.session_manager import current_session
-from code_agent import monitoring
 from code_agent.core.di import container
 import asyncio
+
 
 _logger = monitoring.get_logger(__name__)
 _tracer = monitoring.get_tracer(__name__)
 
 
 async def main():
-    if container.config.logging.otlp_enabled:
-        monitoring.init()
-    logger = monitoring.get_logger(__name__)
-    logger.info("========== Code Agent 启动中 ==========")
+    _logger.info("========== Code Agent 启动中 ==========")
+    config = get_config()
 
     session = container.session_manager.load_last_session()
     if not session:
@@ -31,7 +34,7 @@ async def main():
     print(container.memory_manager.get_summary())
     print("请输入任务描述，输入 '/quit' 退出，输入 '/help' 查看可用指令")
 
-    gate = ModelGate(container.config.gate)
+    gate = ModelGate(config.gate)
 
     # 循环对话
     while True:
@@ -50,9 +53,9 @@ async def main():
         session.add_user_message(task)
 
         try:
-            await execute_reasoning_acting(gate, session, container.config.react)
+            await execute_reasoning_acting(gate, session, config.react)
         except Exception as e:
-            logger.error(f"任务执行失败: {e}", exc_info=True)
+            _logger.error(f"任务执行失败: {e}", exc_info=True)
             print(f"执行错误: {e}")
             continue
 

@@ -4,12 +4,14 @@
 支持异步工具调用
 """
 
+from code_agent import monitoring
 import asyncio
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
 from opentelemetry import trace
 from code_agent.core.di import container
 from pydantic import BaseModel, TypeAdapter
+from opentelemetry.trace.status import StatusCode
 
 from openai.types.chat import (
     ChatCompletionToolUnionParam,
@@ -18,6 +20,8 @@ from openai.types.chat import (
     ChatCompletionMessageFunctionToolCall,
     ChatCompletionToolMessageParam,
 )
+
+_logger = monitoring.get_logger(__name__)
 
 
 @dataclass
@@ -42,6 +46,7 @@ def register_tool(
             is_async=is_async,
         )
         _tools_info[name] = _build_tool_info(name, description, param_type)
+        _logger
         return func
 
     return wrapper
@@ -118,8 +123,7 @@ async def handle_function_tool_call(
 
     tool_info = get_tool(tool_name)
     if tool_info is None:
-        current_span.set_attribute("tool.success", False)
-        current_span.set_attribute("tool.error", "工具不存在")
+        current_span.set_status(StatusCode.ERROR, "工具不存在")
         return {
             "content": "工具不存在",
             "role": "tool",
@@ -131,10 +135,9 @@ async def handle_function_tool_call(
             content = await tool_info.func(tool_call.function.arguments)
         else:
             content = tool_info.func(tool_call.function.arguments)
-        current_span.set_attribute("tool.success", True)
+        current_span.set_status(StatusCode.OK)
     except Exception as e:
-        current_span.set_attribute("tool.success", False)
-        current_span.set_attribute("tool.error", str(e))
+        current_span.set_status(StatusCode.ERROR, str(e))
         raise
 
     return {

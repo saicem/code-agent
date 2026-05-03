@@ -22,7 +22,7 @@ class MemoryManager:
         Args:
             config: 配置对象
         """
-        self.base_dir = config.base_dir
+        self.base_dir = config.storage.base_dir
         self.memo_dir = os.path.join(self.base_dir, ".memo")
         self.memory_file = os.path.join(self.memo_dir, "memory.md")
         self.sessions_dir = os.path.join(self.memo_dir, "sessions")

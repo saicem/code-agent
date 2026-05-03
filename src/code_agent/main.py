@@ -13,7 +13,7 @@ import traceback
 
 
 async def main():
-    if container.config.otlp_enabled:
+    if container.config.logging.otlp_enabled:
         monitoring.init()
     logger = monitoring.get_logger(__name__)
     logger.info("========== Code Agent 启动中 ==========")
@@ -30,7 +30,7 @@ async def main():
 
         # 初始化 Agent
         logger.debug("初始化 CodeAgent...")
-        agent = CodeAgent(container.config.api_key, container.config.base_url)
+        agent = CodeAgent(container.config.openai.api_key, container.config.openai.base_url)
         logger.info("Code Agent 初始化完成")
 
         print("\n" + "=" * 50)

@@ -20,7 +20,7 @@ class Container:
         return Container(
             config=config,
             memory_manager=MemoryManager(config),
-            session_manager=SessionManager(config.sessions_dir),
+            session_manager=SessionManager(config.storage.sessions_dir),
             command_handler=CommandHandler(),
             tracer=trace.get_tracer("code_agent"),
         )

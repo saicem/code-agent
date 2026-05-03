@@ -17,8 +17,6 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-from .metrics import init_metrics
-
 _resource: Resource | None = None
 _trace_provider: trace.TracerProvider | None = None
 _logger_provider: LoggerProvider | None = None
@@ -48,9 +46,6 @@ def init_otlp():
     _log_handler = LoggingHandler(
         level=logging.NOTSET, logger_provider=_logger_provider
     )
-
-    # 初始化 metrics
-    init_metrics(_resource)
 
     root_logger = logging.getLogger()
     root_logger.addHandler(_log_handler)

@@ -5,11 +5,9 @@
 """
 
 import asyncio
-import time
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
-
-from code_agent.monitoring.metrics import record_tool_call
+from opentelemetry import trace
 from code_agent.core.di import container
 from pydantic import BaseModel, TypeAdapter
 
@@ -108,8 +106,6 @@ async def handle_function_tool_call(
     tool_call: ChatCompletionMessageFunctionToolCall,
 ) -> ChatCompletionToolMessageParam:
     """处理工具调用"""
-    from opentelemetry import trace
-
     current_span = trace.get_current_span()
     tool_name = tool_call.function.name
     current_span.set_attributes(
@@ -124,14 +120,11 @@ async def handle_function_tool_call(
     if tool_info is None:
         current_span.set_attribute("tool.success", False)
         current_span.set_attribute("tool.error", "工具不存在")
-        record_tool_call(tool_name, 0.0, success=False)
         return {
             "content": "工具不存在",
             "role": "tool",
             "tool_call_id": tool_call.id,
         }
-
-    tool_start_time = time.time()
 
     try:
         if tool_info.is_async:
@@ -139,13 +132,9 @@ async def handle_function_tool_call(
         else:
             content = tool_info.func(tool_call.function.arguments)
         current_span.set_attribute("tool.success", True)
-        tool_duration = time.time() - tool_start_time
-        record_tool_call(tool_name, tool_duration, success=True)
     except Exception as e:
         current_span.set_attribute("tool.success", False)
         current_span.set_attribute("tool.error", str(e))
-        tool_duration = time.time() - tool_start_time
-        record_tool_call(tool_name, tool_duration, success=False)
         raise
 
     return {

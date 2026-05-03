@@ -11,10 +11,10 @@ from os.path import join, abspath
 from os import makedirs
 
 
-class OpenAIConfig(BaseModel):
+class GateConfig(BaseModel):
     """OpenAI API 配置"""
 
-    api_key: str = Field(default="", description="OpenAI API 密钥")
+    api_key: str = Field(default=..., description="OpenAI API 密钥")
     base_url: str | None = Field(default=None, description="OpenAI API 基础 URL")
     model: str = Field(default="gpt-4o-mini", description="模型名称")
 
@@ -63,10 +63,11 @@ class Config(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         cli_parse_args=True,
+        env_nested_delimiter="__",
     )
 
     # 分组配置
-    openai: OpenAIConfig = Field(default_factory=OpenAIConfig)
+    gate: GateConfig = Field(default_factory=GateConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     context: ContextConfig = Field(default_factory=ContextConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)

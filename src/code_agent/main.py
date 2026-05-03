@@ -3,13 +3,17 @@
 Code Agent 主入口文件
 """
 
+from code_agent.agent.engine import execute_reasoning_acting
+
+from code_agent.agent.gate import ModelGate
+from code_agent.agent import prompt
 from code_agent.core.session_manager import current_session
 from code_agent import monitoring
-from code_agent.engine.prompt import code_system_prompt
 from code_agent.core.di import container
-from code_agent.agent import CodeAgent
 import asyncio
-import traceback
+
+_logger = monitoring.get_logger(__name__)
+_tracer = monitoring.get_tracer(__name__)
 
 
 async def main():
@@ -17,64 +21,42 @@ async def main():
         monitoring.init()
     logger = monitoring.get_logger(__name__)
     logger.info("========== Code Agent 启动中 ==========")
-    try:
-        # 加载或创建会话
-        logger.debug("加载最后会话...")
-        session = container.session_manager.load_last_session()
-        if session:
-            logger.info(f"已加载会话: {session.session_id}")
-        else:
-            session = container.session_manager.create_session()
-            logger.info(f"创建新会话: {session.session_id}")
-        current_session.set(session)
 
-        # 初始化 Agent
-        logger.debug("初始化 CodeAgent...")
-        agent = CodeAgent(container.config.openai.api_key, container.config.openai.base_url)
-        logger.info("Code Agent 初始化完成")
+    session = container.session_manager.load_last_session()
+    if not session:
+        session = container.session_manager.create_session()
+    current_session.set(session)
 
-        print("\n" + "=" * 50)
-        print("记忆摘要:")
-        print(container.memory_manager.get_summary())
-        print("=" * 50 + "\n")
-        print("请输入任务描述，输入 '/quit' 退出，输入 '/help' 查看可用指令")
+    print("记忆摘要:")
+    print(container.memory_manager.get_summary())
+    print("请输入任务描述，输入 '/quit' 退出，输入 '/help' 查看可用指令")
 
-        # 循环对话
-        while True:
-            task = input("\n任务: ")
+    gate = ModelGate(container.config.gate)
 
-            if task.strip() == "":
-                continue
+    # 循环对话
+    while True:
+        task = input("\n任务: ")
 
-            # 处理命令
-            if container.command_handler.handle_command(task):
-                logger.debug(f"已处理命令: {task}")
-                continue
+        if task.strip() == "":
+            continue
 
-            # 执行任务
-            session = current_session.get()
-            session.set_system_prompt(code_system_prompt)
-            session.add_user_message(task)
+        # 处理命令
+        if container.command_handler.handle_command(task):
+            continue
 
-            try:
-                logger.debug(f"开始执行任务: {task[:50]}...")
-                result = await agent.execute_task(session)
-                logger.info("任务执行成功")
-                print(f"\n结果:\n{result}")
-            except Exception as e:
-                logger.error(f"任务执行失败: {e}", exc_info=True)
-                print(f"执行错误: {e}")
-                continue
+        # 执行任务
+        session = current_session.get()
+        session.set_system_prompt(prompt.code_system)
+        session.add_user_message(task)
 
-            # 保存会话
-            logger.debug("保存会话...")
-            container.session_manager.save_session(session)
-            logger.debug("会话保存成功")
+        try:
+            await execute_reasoning_acting(gate, session, container.config.react)
+        except Exception as e:
+            logger.error(f"任务执行失败: {e}", exc_info=True)
+            print(f"执行错误: {e}")
+            continue
 
-    except Exception as e:
-        logger.critical(f"Code Agent 启动失败: {e}", exc_info=True)
-        print(f"启动错误: {e}")
-        traceback.print_exc()
+        container.session_manager.save_session(session)
 
 
 if __name__ == "__main__":

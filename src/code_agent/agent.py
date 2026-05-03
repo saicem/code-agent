@@ -7,16 +7,15 @@ Code Agent 类
 from code_agent.monitoring.metrics import record_task_start, record_task_completion
 from code_agent.engine.react_engine import ReActEngine
 from code_agent.core.session import Session
+from . import monitoring
 
-import logging
 import time
 
 from openai import AsyncOpenAI
-from opentelemetry import trace
 
 
-tracer = trace.get_tracer("agent")
-logger = logging.getLogger(__name__)
+tracer = monitoring.get_tracer(__name__)
+logger = monitoring.get_logger(__name__)
 
 
 class CodeAgent:

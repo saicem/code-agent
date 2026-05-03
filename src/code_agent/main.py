@@ -4,27 +4,18 @@ Code Agent 主入口文件
 """
 
 from code_agent.core.session_manager import current_session
-
+from code_agent import monitoring
 from code_agent.engine.prompt import code_system_prompt
-from code_agent.monitoring.otlp import init_otlp
 from code_agent.core.di import container
 from code_agent.agent import CodeAgent
 import asyncio
-import logging
 import traceback
-
-file_handler = logging.FileHandler(container.config.log_file, encoding="utf-8")
-file_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-file_handler.setFormatter(formatter)
-logger = logging.getLogger()
-logger.addHandler(file_handler)
-logger.setLevel(logging.DEBUG)
 
 
 async def main():
     if container.config.otlp_enabled:
-        init_otlp()
+        monitoring.init()
+    logger = monitoring.get_logger(__name__)
     logger.info("========== Code Agent 启动中 ==========")
     try:
         # 加载或创建会话

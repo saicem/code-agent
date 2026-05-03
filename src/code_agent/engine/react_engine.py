@@ -4,12 +4,10 @@ ReAct 引擎模块
 负责执行异步 ReAct 推理循环
 """
 
-import logging
 import time
 from typing import List, Any
 
 from openai import AsyncOpenAI
-from opentelemetry import trace
 
 from code_agent.core.session import Session
 from code_agent.core.di import container
@@ -23,9 +21,11 @@ from code_agent.monitoring.metrics import (
     record_react_cycles,
     record_message,
 )
+from code_agent import monitoring
 
-tracer = trace.get_tracer("react_engine")
-logger = logging.getLogger(__name__)
+
+tracer = monitoring.get_tracer("react_engine")
+logger = monitoring.get_logger(__name__)
 
 
 class ReActEngine:
@@ -74,6 +74,7 @@ class ReActEngine:
             logger.info(f"任务完成，共执行 {cycle_count} 次循环")
             return "任务结束"
 
+    @tracer.start_as_current_span("call_model")
     async def _call_model(self, session: Session) -> tuple[Any, float]:
         """异步调用模型
 
@@ -83,18 +84,13 @@ class ReActEngine:
         Returns:
             (响应对象, 耗时)
         """
-        logger.debug("异步调用 OpenAI API...")
         api_start_time = time.time()
-
         response = await self.client.chat.completions.create(
             model=self.config.model,
             messages=session.messages_for_model(),
             tools=tools_for_model(),
         )
-
         api_duration = time.time() - api_start_time
-        logger.debug("异步 OpenAI API 调用完成")
-
         return response, api_duration
 
     async def _handle_response(

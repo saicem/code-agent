@@ -1,5 +1,5 @@
-from ._otlp import get_logger, get_tracer
-from ._otlp import init_otlp as _init_otlp
+from code_agent.monitoring._otlp import get_logger, get_tracer
+from code_agent.monitoring._otlp import init_otlp as _init_otlp
 
 __all__ = [
     "get_logger",

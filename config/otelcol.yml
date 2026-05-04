@@ -6,9 +6,33 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+connectors:
+  exceptions:
+  sum/gen_ai:
+    spans:
+      gen_ai.usage.input_tokens:
+        source_attribute: gen_ai.usage.input_tokens
+        conditions:
+          - attributes["gen_ai.usage.input_tokens"] != "NULL"
+      gen_ai.usage.output_tokens:
+        source_attribute: gen_ai.usage.output_tokens
+        conditions:
+          - attributes["gen_ai.usage.output_tokens"] != "NULL"
+
+  span_metrics/gen_ai:
+    histogram:
+    dimensions:
+      - name: gen_ai.operation.name
+      - name: gen_ai.provider.name
+      - name: gen_ai.token.type
+      - name: gen_ai.request.model
+      - name: gen_ai.tool.name
+    exemplars:
+      enabled: true
+
 exporters:
   # 发送 traces 到 Tempo
-  otlp/tempo:
+  otlp_grpc/tempo:
     endpoint: tempo:4317
     tls:
       insecure: true
@@ -26,10 +50,10 @@ service:
   pipelines:
     traces:
       receivers: [ otlp ]
-      exporters: [ otlp/tempo ]
+      exporters: [ otlp_grpc/tempo, span_metrics/gen_ai, exceptions, sum/gen_ai ]
     logs:
       receivers: [ otlp ]
       exporters: [ otlp_http/loki ]
     metrics:
-      receivers: [ otlp ]
+      receivers: [ otlp, span_metrics/gen_ai, exceptions, sum/gen_ai ]
       exporters: [ prometheus ]

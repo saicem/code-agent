@@ -1,7 +1,11 @@
+from code_agent.monitoring import get_tracer
 from typing import Any, Callable
 
 from code_agent.commands.session import register_session_commands
 from code_agent.commands.system import register_system_commands
+
+
+tracer = get_tracer(__name__)
 
 
 class CommandHandler:
@@ -62,5 +66,6 @@ class CommandHandler:
 _command_handler = CommandHandler()
 
 
+@tracer.start_as_current_span("handle_command")
 def handle_command(command: str):
     _command_handler.handle_command(command)

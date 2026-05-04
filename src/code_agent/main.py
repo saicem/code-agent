@@ -42,7 +42,8 @@ async def main():
             continue
 
         # 处理命令
-        if handle_command(task):
+        if task.startswith("/"):
+            handle_command(task)
             continue
 
         # 执行任务

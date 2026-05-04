@@ -8,6 +8,7 @@ import logging
 from opentelemetry import _logs, trace
 from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.openai import OpenAIInstrumentor
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
@@ -15,26 +16,27 @@ from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-_resource: Resource | None = None
+resource: Resource | None = None
 _trace_provider: trace.TracerProvider | None = None
 _logger_provider: LoggerProvider | None = None
 _log_handler: LoggingHandler | None = None
 
 
 def init_otlp():
-    global _resource, _trace_provider, _logger_provider, _log_handler
+    global resource, _trace_provider, _logger_provider, _log_handler
     """初始化 OTLP 导出器"""
     OpenAIInstrumentor().instrument()
+    HTTPXClientInstrumentor().instrument()
 
-    _resource = Resource.create(attributes={SERVICE_NAME: "code-agent"})
+    resource = Resource.create(attributes={SERVICE_NAME: "code-agent"})
 
     # 先初始化 trace provider（日志需要依赖它）
-    _trace_provider = TracerProvider(resource=_resource)
+    _trace_provider = TracerProvider(resource=resource)
     _trace_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     trace.set_tracer_provider(_trace_provider)
 
     # 初始化 logger provider，确保与 trace 关联
-    _logger_provider = LoggerProvider(resource=_resource)
+    _logger_provider = LoggerProvider(resource=resource)
     _logger_provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter()))
     _logs.set_logger_provider(_logger_provider)
 

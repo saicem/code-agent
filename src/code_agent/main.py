@@ -3,22 +3,20 @@
 Code Agent 主入口文件
 """
 
-from code_agent import monitoring
-from code_agent.core.config import get_config
-
-if get_config().logging.otlp_enabled:
-    monitoring.init()
-
 import asyncio
 
+import code_agent._setup  # noqa: F401
 from code_agent.agent import prompt
 from code_agent.agent.engine import execute_reasoning_acting
 from code_agent.agent.gate import ModelGate
+from code_agent.commands import handle_command
+from code_agent.core.config import get_config
 from code_agent.core.di import container
 from code_agent.core.session_manager import current_session
+from code_agent.monitoring import get_logger, get_tracer
 
-_logger = monitoring.get_logger(__name__)
-_tracer = monitoring.get_tracer(__name__)
+_logger = get_logger(__name__)
+_tracer = get_tracer(__name__)
 
 
 async def main():
@@ -44,7 +42,7 @@ async def main():
             continue
 
         # 处理命令
-        if container.command_handler.handle_command(task):
+        if handle_command(task):
             continue
 
         # 执行任务

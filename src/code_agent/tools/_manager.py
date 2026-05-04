@@ -4,7 +4,6 @@
 支持异步工具调用
 """
 
-
 import asyncio
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
@@ -88,4 +87,3 @@ def _build_tool_info(
             "parameters": TypeAdapter(param_type).json_schema(mode="serialization"),
         },
     }
-

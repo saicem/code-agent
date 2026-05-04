@@ -3,6 +3,7 @@
 网络搜索工具
 使用 DuckDuckGo 搜索
 """
+
 from ddgs import DDGS
 from pydantic import BaseModel, Field
 

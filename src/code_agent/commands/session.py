@@ -1,3 +1,4 @@
+from code_agent.core.di import container
 from code_agent.core.session_manager import SessionManager, current_session
 
 
@@ -95,7 +96,6 @@ def _handle_session(command: str) -> None:
 
 
 def _get_session_manager() -> SessionManager:
-    from code_agent.core.di import container
 
     return container.session_manager
 

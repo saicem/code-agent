@@ -4,6 +4,7 @@ HTTP 请求工具
 使用 httpx 发送 HTTP 请求到特定地址
 区别于网络搜索工具，此工具可直接请求指定的 API 或网页
 """
+
 from typing import Any, Dict, Optional
 
 import httpx

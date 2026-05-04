@@ -3,12 +3,11 @@
 网络搜索工具
 使用 DuckDuckGo 搜索
 """
-
 from ddgs import DDGS
 from pydantic import BaseModel, Field
 
 from code_agent.core.exceptions import ToolException
-from code_agent.tools.tool_manager import register_tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_tool_response,
     validate_params,
@@ -22,7 +21,7 @@ class SearchParams(BaseModel):
     limit: int = Field(3, description="返回结果数量，默认为 3")
 
 
-@register_tool(
+@tool(
     name="search_web",
     description="搜索网络内容。当你需要获取最新信息或外部知识时使用此工具。",
     param_type=SearchParams,

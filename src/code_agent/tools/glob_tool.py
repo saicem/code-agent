@@ -2,7 +2,6 @@
 """
 按文件名模式搜索文件工具
 """
-
 import asyncio
 import glob
 import os
@@ -10,7 +9,7 @@ import os
 from pydantic import BaseModel, Field
 
 from code_agent.core.exceptions import ToolException
-from code_agent.tools.tool_manager import register_tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_full_path,
     build_tool_response,
@@ -59,7 +58,7 @@ def _do_search(full_path: str, pattern: str) -> list[str]:
     return sorted([os.path.relpath(f, base_dir) for f in all_files])
 
 
-@register_tool(
+@tool(
     name="search_files",
     description="按文件名模式搜索文件，支持通配符 * 和 ?，支持使用 | 分隔多个模式",
     param_type=GlobParams,

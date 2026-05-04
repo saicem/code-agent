@@ -3,14 +3,13 @@
 文件编辑工具
 用于精确替换部分文件内容
 """
-
 import asyncio
 import os
 
 from pydantic import BaseModel, Field
 
 from code_agent.core.exceptions import ToolException
-from code_agent.tools.tool_manager import register_tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_full_path,
     build_tool_response,
@@ -26,7 +25,7 @@ class EditParams(BaseModel):
     new_string: str = Field(..., description="要替换的新字符串")
 
 
-@register_tool(
+@tool(
     name="edit_file",
     description="精确替换文件中的部分内容",
     param_type=EditParams,

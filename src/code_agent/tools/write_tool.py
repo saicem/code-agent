@@ -3,13 +3,12 @@
 写入工具
 用于写入文件内容
 """
-
 import os
 
 from pydantic import BaseModel, Field
 
 from code_agent.core.exceptions import ToolException
-from code_agent.tools.tool_manager import register_tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_full_path,
     build_tool_response,
@@ -25,7 +24,7 @@ class WriteParams(BaseModel):
     overwrite: bool = Field(True, description="是否覆盖现有文件，默认为 True")
 
 
-@register_tool(
+@tool(
     name="write_file",
     description="写入文件内容到指定路径。当你需要创建或修改文件时使用此工具。",
     param_type=WriteParams,

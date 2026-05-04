@@ -3,14 +3,13 @@
 读取工具
 用于读取文件内容
 """
-
 import asyncio
 import os
 
 from pydantic import BaseModel, Field
 
 from code_agent.core.exceptions import ToolException
-from code_agent.tools.tool_manager import register_tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_full_path,
     build_tool_response,
@@ -24,7 +23,7 @@ class ReadParams(BaseModel):
     file_path: str = Field(..., description="文件路径，相对于项目根目录")
 
 
-@register_tool(
+@tool(
     name="read_file",
     description="读取指定文件的内容。当你需要查看文件内容时使用此工具。",
     param_type=ReadParams,

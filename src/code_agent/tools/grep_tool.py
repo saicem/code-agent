@@ -2,7 +2,6 @@
 """
 按内容搜索文件工具
 """
-
 import asyncio
 import os
 import re
@@ -10,7 +9,7 @@ import re
 from pydantic import BaseModel, Field
 
 from code_agent.core.exceptions import ToolException
-from code_agent.tools.tool_manager import register_tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_full_path,
     build_tool_response,
@@ -66,7 +65,7 @@ def _do_search(full_path: str, pattern: str, file_pattern: str) -> list[dict]:
     return results
 
 
-@register_tool(
+@tool(
     name="search_content",
     description="按内容搜索文件",
     param_type=GrepParams,

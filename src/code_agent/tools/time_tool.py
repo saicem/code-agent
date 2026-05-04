@@ -9,7 +9,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from code_agent.core.exceptions import ToolException
-from code_agent.tools.tool_manager import register_tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_tool_response,
     validate_params,
@@ -22,7 +22,7 @@ class TimeParams(BaseModel):
     pass
 
 
-@register_tool(
+@tool(
     name="get_current_time",
     description="获取当前时间。当你需要知道当前时间或处理与时间相关的问题时调用此工具。",
     param_type=TimeParams,

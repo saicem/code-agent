@@ -2,13 +2,12 @@
 """
 终端命令执行工具
 """
-
 import asyncio
 import os
 
 from pydantic import BaseModel, Field
 
-from code_agent.tools.tool_manager import register_tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_full_path,
     build_tool_response,
@@ -23,7 +22,7 @@ class BashParams(BaseModel):
     cwd: str | None = Field(None, description="命令执行的工作目录，默认为基础目录")
 
 
-@register_tool(
+@tool(
     name="run_bash",
     description="执行终端命令，例如删除文件、移动文件、查看目录结构等",
     param_type=BashParams,

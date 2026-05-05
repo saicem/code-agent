@@ -4,7 +4,6 @@
 用于读取文件内容
 """
 
-import asyncio
 import os
 
 from pydantic import BaseModel, Field
@@ -29,7 +28,7 @@ class ReadParams(BaseModel):
     description="读取指定本地文件的全部内容。适用于查看文件内容、获取代码或文档内容的场景。",
     param_type=ReadParams,
 )
-async def read_file(params: str) -> str:
+def read_file(params: str) -> str:
     """读取文件
 
     Args:
@@ -39,26 +38,23 @@ async def read_file(params: str) -> str:
         JSON 格式的结果字符串
     """
     try:
-        # 使用统一工具函数校验参数
         validated_params = validate_params(params, ReadParams)
         full_path = build_full_path(validated_params.file_path)
 
-        # 检查文件是否存在
         if not os.path.exists(full_path):
             return build_tool_response(
                 False,
                 f"文件不存在: {validated_params.file_path}",
             )
 
-        # 检查是否是文件
         if not os.path.isfile(full_path):
             return build_tool_response(
                 False,
                 f"路径不是文件: {validated_params.file_path}",
             )
 
-        # 异步读取文件
-        content = await asyncio.to_thread(lambda: open(full_path, "r", encoding="utf-8").read())
+        with open(full_path, "r", encoding="utf-8") as f:
+            content = f.read()
 
         return build_tool_response(
             True,

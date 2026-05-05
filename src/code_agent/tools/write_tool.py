@@ -55,7 +55,6 @@ def write_file(params: str) -> str:
                 data={"file_path": validated_params.file_path},
             )
 
-        # 异步写入文件
         with open(full_path, "w", encoding="utf-8") as f:
             f.write(validated_params.content)
 

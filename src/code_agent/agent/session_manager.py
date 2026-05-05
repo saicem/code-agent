@@ -4,8 +4,8 @@ import os
 from dataclasses import asdict
 from typing import Any
 
+from code_agent.agent.session import Session
 from code_agent.core.config import get_config
-from code_agent.core.session import Session
 from code_agent.monitoring import get_logger
 
 _logger = get_logger(__name__)

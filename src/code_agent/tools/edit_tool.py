@@ -8,7 +8,7 @@ import os
 
 from pydantic import BaseModel, Field
 
-from code_agent.tools._manager import TOOL_TAG_CODE, tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_full_path,
     build_tool_response,
@@ -28,7 +28,7 @@ class EditParams(BaseModel):
     name="modify_file_content",
     description="精确替换文件中的指定文本内容。需要提供旧字符串和新字符串，适用于对已有文件进行局部修改的场景，区别于覆盖式写入。",
     param_type=EditParams,
-    tags=[TOOL_TAG_CODE],
+    tags=["code"],
 )
 def edit_file(params: str) -> str:
     """编辑文件

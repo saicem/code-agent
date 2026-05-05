@@ -1,4 +1,4 @@
-from code_agent.core.session_manager import SessionManager, current_session, get_session_manager
+from code_agent.agent.session_manager import SessionManager, current_session, get_session_manager
 from code_agent.utils import print_system_output
 
 
@@ -62,6 +62,7 @@ def _handle_session_info(session_manager: SessionManager) -> None:
     print_system_output(f"  创建时间: {session.data.created_at[:19].replace('T', ' ')}", "info")
     print_system_output(f"  更新时间: {session.data.updated_at[:19].replace('T', ' ')}", "info")
     print_system_output(f"  消息数量: {len(session.data.messages)}", "info")
+    print_system_output(f"  预估总Token数: {session.data.total_token}", "info")
 
 
 def _handle_session(command: str) -> None:

@@ -8,7 +8,7 @@ import os
 
 from pydantic import BaseModel, Field
 
-from code_agent.tools._manager import TOOL_TAG_CODE, tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_full_path,
     build_tool_response,
@@ -27,7 +27,7 @@ class BashParams(BaseModel):
     name="execute_command",
     description="执行系统终端命令（如删除、移动、复制文件，查看目录结构，运行程序等）。适用于需要操作系统层面操作的场景。",
     param_type=BashParams,
-    tags=[TOOL_TAG_CODE],
+    tags=["code"],
 )
 async def run_bash(params: str) -> str:
     """执行终端命令

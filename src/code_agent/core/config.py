@@ -24,14 +24,12 @@ class StorageConfig(BaseModel):
 
     base_dir: str = Field(default=".", description="基础目录")
     storage_dir: str = Field(default="", description="存储目录")
-    memory_file: str = Field(default="", description="记忆文件路径")
     sessions_dir: str = Field(default="", description="会话目录")
 
 
 class ContextConfig(BaseModel):
     """上下文相关配置"""
 
-    max_length: int = Field(default=1000, description="会话上下文最大长度")
     max_dialogues: int = Field(default=10, description="会话上下文最大对话数量")
     context_file: str = Field(default="", description="会话上下文文件路径")
 
@@ -45,8 +43,6 @@ class SecurityConfig(BaseModel):
 class LoggingConfig(BaseModel):
     """日志相关配置"""
 
-    log_file: str = Field(default="", description="日志文件路径")
-    log_level: str = Field(default="INFO", description="日志级别")
     otlp_enabled: bool = Field(default=False, description="是否启用 OTLP 导出器")
 
 
@@ -54,7 +50,7 @@ class EngineConfig(BaseModel):
     """模型调用逻辑相关配置"""
 
     max_cycles: int = Field(default=20, description="最大循环次数")
-    max_token: int = Field(default=3000, description="会话上下文最大 token 数量")
+    max_token: int = Field(default=8000, description="会话上下文最大 token 数量")
 
 
 class Config(BaseSettings):
@@ -92,17 +88,9 @@ class Config(BaseSettings):
         if not self.storage.sessions_dir:
             self.storage.sessions_dir = join(self.storage.storage_dir, "sessions")
 
-        # 记忆文件
-        if not self.storage.memory_file:
-            self.storage.memory_file = join(self.storage.storage_dir, "memory.md")
-
         # 上下文文件
         if not self.context.context_file:
             self.context.context_file = join(self.storage.storage_dir, "session_context.json")
-
-        # 日志文件
-        if not self.logging.log_file:
-            self.logging.log_file = join(self.storage.base_dir, "agent.log")
 
     def _ensure_directories(self):
         """确保必要的目录存在"""

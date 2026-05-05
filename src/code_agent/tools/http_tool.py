@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional
 import httpx
 from pydantic import BaseModel, Field
 
-from code_agent.tools._manager import TOOL_TAG_CODE, TOOL_TAG_PLAN, tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_tool_response,
     validate_params,
@@ -34,7 +34,7 @@ class HttpRequestParams(BaseModel):
     name="send_http_request",
     description="发送 HTTP 请求到指定 URL。适用于调用 API 或获取网页源码。",
     param_type=HttpRequestParams,
-    tags=[TOOL_TAG_CODE, TOOL_TAG_PLAN],
+    tags=["code", "plan"],
 )
 async def http_request(params: str) -> str:
     """发送 HTTP 请求

@@ -8,7 +8,7 @@ import os
 
 from pydantic import BaseModel, Field
 
-from code_agent.tools._manager import TOOL_TAG_CODE, tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_full_path,
     build_tool_response,
@@ -26,7 +26,7 @@ class ReadParams(BaseModel):
     name="read_file_content",
     description="读取指定本地文件的全部内容。适用于查看文件内容、获取代码或文档内容的场景。",
     param_type=ReadParams,
-    tags=[TOOL_TAG_CODE],
+    tags=["code"],
 )
 def read_file(params: str) -> str:
     """读取文件

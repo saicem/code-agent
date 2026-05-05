@@ -6,11 +6,11 @@ Code Agent 主入口文件
 import asyncio
 
 import code_agent._setup  # noqa: F401
-from code_agent.agent import prompt
 from code_agent.agent.engine import plan_and_execute
-from code_agent.agent.gate import get_gate
+from code_agent.agent.memory import load_memory, update_memory
+from code_agent.agent.prompt import PLAN_AND_EXECUTE_SYSTEM
+from code_agent.agent.session_manager import current_session, get_session_manager
 from code_agent.commands import handle_command
-from code_agent.core.session_manager import current_session, get_session_manager
 from code_agent.monitoring import get_logger, get_tracer
 from code_agent.utils import get_user_input, print_system_output
 
@@ -27,9 +27,10 @@ async def main():
         session = session_manager.create_session()
     current_session.set(session)
 
-    print_system_output("请输入任务描述，输入 '/quit' 退出，输入 '/help' 查看可用指令", "info")
+    await update_memory()
 
-    gate = get_gate()
+    print_system_output("请输入任务描述，输入 '/quit' 退出，输入 '/help' 查看可用指令", "info")
+    prompt = PLAN_AND_EXECUTE_SYSTEM + load_memory()
 
     # 循环对话
     while True:
@@ -45,11 +46,10 @@ async def main():
 
         # 执行任务
         session = current_session.get()
-        session.set_system_prompt(prompt.PLAN_AND_EXECUTE_SYSTEM)
+        session.set_system_prompt(prompt)
         session.add_user_message(task)
-
         try:
-            await plan_and_execute(gate, session)
+            await plan_and_execute(session)
         except Exception as e:
             _logger.error(f"任务执行失败: {e}", exc_info=True)
             print_system_output(f"执行错误: {e}", "error")

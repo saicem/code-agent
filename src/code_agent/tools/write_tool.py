@@ -8,7 +8,7 @@ import os
 
 from pydantic import BaseModel, Field
 
-from code_agent.tools._manager import TOOL_TAG_CODE, tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_full_path,
     build_tool_response,
@@ -28,7 +28,7 @@ class WriteParams(BaseModel):
     name="create_or_overwrite_file",
     description="将内容写入指定路径的文件（默认覆盖现有文件）。适用于创建新文件或完全重写现有文件的场景，区别于局部修改。",
     param_type=WriteParams,
-    tags=[TOOL_TAG_CODE],
+    tags=["code"],
 )
 def write_file(params: str) -> str:
     """写入文件

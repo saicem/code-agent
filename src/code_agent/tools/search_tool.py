@@ -7,7 +7,7 @@
 from ddgs import DDGS
 from pydantic import BaseModel, Field
 
-from code_agent.tools._manager import TOOL_TAG_CODE, TOOL_TAG_PLAN, tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_tool_response,
     validate_params,
@@ -25,7 +25,7 @@ class SearchParams(BaseModel):
     name="web_search",
     description="通过搜索引擎搜索互联网内容，获取最新资讯、技术文档、外部知识等。适用于需要查找外部信息的场景，区别于本地文件搜索。",
     param_type=SearchParams,
-    tags=[TOOL_TAG_CODE, TOOL_TAG_PLAN],
+    tags=["code", "plan"],
 )
 async def search_web(params: str) -> str:
     """搜索网络内容

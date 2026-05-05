@@ -7,18 +7,17 @@ from openai.types.chat import ChatCompletionMessageToolCallUnion
 from opentelemetry import trace
 
 from code_agent import monitoring
-from code_agent.agent.gate import GenAiGate
+from code_agent.agent.gate import get_gate
 from code_agent.agent.prompt import (
     COMPRESS_SYSTEM,
     COMPRESS_USER_CALL_MESSAGE,
 )
+from code_agent.agent.session import Session
 from code_agent.core.config import get_config
-from code_agent.core.session import Session
 from code_agent.tools import (
     handle_tool_calls,
     tools_for_gen_ai,
 )
-from code_agent.tools._manager import TOOL_TAG_PLAN
 from code_agent.utils import print_model_output
 
 _tracer = monitoring.get_tracer(__name__)
@@ -27,17 +26,20 @@ _engine_config = get_config().engine
 
 
 @_tracer.start_as_current_span("reasoning_acting")
-async def reasoning_acting(gate: GenAiGate, session: Session, tag: str) -> None:
+async def reasoning_acting(session: Session, tag: str) -> None:
     span = trace.get_current_span()
     span.set_attribute("gen_ai.tool.tag", tag)
+    span.set_attribute("gen_ai.session_id", session.data.session_id)
+    if session.data.parent_session_id is not None:
+        span.set_attribute("gen_ai.parent_session_id", session.data.parent_session_id)
     _logger.info(f"开始 ReAct 循环，最大循环次数: {_engine_config.max_cycles}，工具标签: {tag}")
     cycle_count = 0
     while cycle_count < _engine_config.max_cycles:
         cycle_count += 1
         _logger.debug(f"第 {cycle_count + 1} 次循环")
         if session.data.total_token >= _engine_config.max_token:
-            await _compress_session(session, gate)
-        response = await gate.call_model(session.data.messages, tools_for_gen_ai(tag))
+            await _compress_session(session)
+        response = await get_gate().call_model(session.data.messages, tools_for_gen_ai(tag))
         message = response.choices[0].message
 
         # 处理助手消息
@@ -46,6 +48,9 @@ async def reasoning_acting(gate: GenAiGate, session: Session, tag: str) -> None:
             session.add_assistant_message(message.content)
             tool_call_summary = _get_tool_summary(message.tool_calls) if message.tool_calls else ""
             print_model_output(message.content + tool_call_summary)
+
+        if response.usage:
+            session.data.total_token = response.usage.total_tokens
 
         # 处理工具调用
         if message.tool_calls is None:
@@ -62,23 +67,34 @@ async def reasoning_acting(gate: GenAiGate, session: Session, tag: str) -> None:
 
 @_tracer.start_as_current_span("plan_and_execute")
 async def plan_and_execute(
-    gate: GenAiGate,
     session: Session,
 ) -> None:
-    await reasoning_acting(gate, session, TOOL_TAG_PLAN)
+    await reasoning_acting(session, "plan")
 
 
-async def _compress_session(session: Session, gate: GenAiGate) -> None:
+@_tracer.start_as_current_span("compress_session")
+async def _compress_session(session: Session) -> None:
+    span = trace.get_current_span()
     _logger.info(f"压缩会话: {session.data.session_id} 总token: {session.data.total_token}")
     old_system_prompt = session.data.system_prompt
     session.set_system_prompt(COMPRESS_SYSTEM)
     session.add_user_message(COMPRESS_USER_CALL_MESSAGE)
-    result = await gate.call_model(session.data.messages)
+    result = await get_gate().call_model(session.data.messages)
     compressed_content = result.choices[0].message.content
     if compressed_content:
         session.clear_message()
         session.add_user_message(compressed_content)
         session.set_system_prompt(old_system_prompt)
+        if result.usage:
+            session.data.total_token = result.usage.completion_tokens
+            span.add_event(
+                "context_compressed",
+                {
+                    "gen_ai.token.original": result.usage.prompt_tokens,
+                    "gen_ai.token.compressed": result.usage.completion_tokens,
+                    "gen_ai.session_id": session.data.session_id,
+                },
+            )
         _logger.info(f"会话 {session.data.session_id} 压缩完成")
     else:
         _logger.error(f"会话压缩 {session.data.session_id} 失败")

@@ -9,11 +9,11 @@ import json
 from pydantic import BaseModel, Field
 
 from code_agent import monitoring
-from code_agent.agent.gate import get_gate
 from code_agent.agent.prompt import CODE_SYSTEM
+from code_agent.agent.session import Session
+from code_agent.agent.session_manager import current_session, get_session_manager
 from code_agent.core.exceptions import ToolException
-from code_agent.core.session import Session
-from code_agent.tools._manager import TOOL_TAG_CODE, TOOL_TAG_PLAN, tool
+from code_agent.tools._manager import tool
 from code_agent.utils import print_tool_output
 from code_agent.utils.tool_util import build_tool_response
 
@@ -31,7 +31,7 @@ class SubAgentTaskParams(BaseModel):
     name="delegate_to_sub_agent",
     description="将独立的子任务委托给子Agent执行，并返回结果摘要。适用于代码分析、文档生成、复杂问题分解等需要独立推理的场景，可保持主Agent上下文整洁。",
     param_type=SubAgentTaskParams,
-    tags=[TOOL_TAG_PLAN],
+    tags=["plan"],
 )
 async def run_sub_agent_task(params: str) -> str:
     # 延迟导入，避免循环依赖
@@ -50,7 +50,18 @@ async def run_sub_agent_task(params: str) -> str:
     sub_session = Session()
     sub_session.set_system_prompt(CODE_SYSTEM)
     sub_session.add_user_message(validated_params.task)
-    await reasoning_acting(get_gate(), sub_session, TOOL_TAG_CODE)
+    sub_session.data.parent_session_id = current_session.get().data.session_id
+
+    # 保存当前会话并设置子会话
+    token = current_session.set(sub_session)
+    try:
+        await reasoning_acting(sub_session, "code")
+    finally:
+        # 恢复原来的会话
+        current_session.reset(token)
+
+    # 保存子会话
+    get_session_manager().save_session(sub_session)
 
     if not sub_session.data.messages:
         _logger.error("子Agent没有返回任何消息")

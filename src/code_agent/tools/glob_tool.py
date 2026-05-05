@@ -9,7 +9,7 @@ import os
 
 from pydantic import BaseModel, Field
 
-from code_agent.tools._manager import TOOL_TAG_CODE, tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_tool_response,
     validate_params,
@@ -33,7 +33,7 @@ def _do_search(pattern: str) -> list[str]:
     name="find_files_by_pattern",
     description="按文件名模式查找文件（支持通配符 * 和 ?）。适用于根据文件名或扩展名搜索本地文件。",
     param_type=GlobParams,
-    tags=[TOOL_TAG_CODE],
+    tags=["code"],
 )
 async def search_files(params: str) -> str:
     """搜索文件

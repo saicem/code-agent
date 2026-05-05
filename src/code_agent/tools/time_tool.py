@@ -8,7 +8,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from code_agent.tools._manager import TOOL_TAG_CODE, TOOL_TAG_PLAN, tool
+from code_agent.tools._manager import tool
 from code_agent.utils.tool_util import (
     build_tool_response,
     validate_params,
@@ -25,7 +25,7 @@ class TimeParams(BaseModel):
     name="retrieve_current_time",
     description="获取当前系统时间。适用于需要时间戳、日志记录或时间相关计算的场景。",
     param_type=TimeParams,
-    tags=[TOOL_TAG_CODE, TOOL_TAG_PLAN],
+    tags=["code", "plan"],
 )
 async def get_current_time(params: str) -> str:
     """获取当前时间

@@ -7,7 +7,7 @@
 import asyncio
 from dataclasses import dataclass
 from functools import cache
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Literal
 
 from openai.types.chat import (
     ChatCompletionFunctionToolParam,
@@ -20,8 +20,7 @@ from code_agent.core.exceptions import SystemException
 
 _logger = monitoring.get_logger(__name__)
 
-TOOL_TAG_CODE = "code"
-TOOL_TAG_PLAN = "plan"
+type ToolTag = Literal["code", "plan"]
 
 
 @dataclass
@@ -40,7 +39,7 @@ _tags_tool_map: dict[str, list[str]] = {}
 
 
 def _register_tool[T: Callable](
-    name: str, description: str, param_type: type[BaseModel], tags: list[str], func: T
+    name: str, description: str, param_type: type[BaseModel], tags: Iterable[ToolTag], func: T
 ) -> None:
     is_async = asyncio.iscoroutinefunction(func)
     tool_info = ToolInfo(
@@ -56,7 +55,7 @@ def _register_tool[T: Callable](
 
 
 def tool[T: Callable](
-    name: str, description: str, param_type: type[BaseModel], tags: list[str]
+    name: str, description: str, param_type: type[BaseModel], tags: Iterable[ToolTag]
 ) -> Callable[[T], T]:
     def decorator(func: T) -> T:
         _register_tool(name, description, param_type, tags, func)

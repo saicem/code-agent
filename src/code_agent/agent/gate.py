@@ -8,13 +8,13 @@ from openai.types.chat import (
 )
 
 from code_agent import monitoring
-from code_agent.core.config import GateConfig
+from code_agent.core.config import GateConfig, get_config
 
 _tracer = monitoring.get_tracer(__name__)
 _logger = monitoring.get_logger(__name__)
 
 
-class ModelGate:
+class GenAiGate:
     def __init__(self, model_config: GateConfig):
         self.client = AsyncOpenAI(
             api_key=model_config.api_key,
@@ -33,3 +33,10 @@ class ModelGate:
             tools=tools,
         )
         return result
+
+
+_gate = GenAiGate(get_config().gate)
+
+
+def get_gate():
+    return _gate

@@ -3,6 +3,7 @@ from typing import Any, Callable
 from code_agent.commands.session import register_session_commands
 from code_agent.commands.system import register_system_commands
 from code_agent.monitoring import get_tracer
+from code_agent.utils import print_system_output
 
 tracer = get_tracer(__name__)
 
@@ -34,13 +35,13 @@ class CommandHandler:
             try:
                 handler(command=command)
             except Exception as e:
-                print(f"执行指令出错: {e}")
+                print_system_output(f"执行指令出错: {e}", "error")
             return True
         else:
-            print(f"未知指令: {base_cmd}")
-            print("可用指令:")
+            print_system_output(f"未知指令: {base_cmd}", "warning")
+            print_system_output("可用指令:", "info")
             for cmd, info in sorted(self._commands.items()):
-                print(f"  {cmd}: {info['description']}")
+                print_system_output(f"  {cmd}: {info['description']}", "info")
             return True
 
     def get_available_commands(self) -> dict[str, str]:
@@ -50,14 +51,14 @@ class CommandHandler:
         def help_command(_command: str):
             sorted_commands = sorted(self._commands.items())
             for cmd, info in sorted_commands:
-                print(f"  {cmd}: {info['description']}")
-            print("\n可用指令:")
-            print("\n会话管理指令:")
-            print("  /session list      - 列出所有会话")
-            print("  /session switch <id> - 切换到指定会话")
-            print("  /session new       - 创建新会话")
-            print("  /session delete <id> - 删除指定会话")
-            print("  /session info      - 显示当前会话信息")
+                print_system_output(f"  {cmd}: {info['description']}", "info")
+            print_system_output("\n可用指令:", "info")
+            print_system_output("\n会话管理指令:", "info")
+            print_system_output("  /session list      - 列出所有会话", "info")
+            print_system_output("  /session switch <id> - 切换到指定会话", "info")
+            print_system_output("  /session new       - 创建新会话", "info")
+            print_system_output("  /session delete <id> - 删除指定会话", "info")
+            print_system_output("  /session info      - 显示当前会话信息", "info")
 
         return help_command
 

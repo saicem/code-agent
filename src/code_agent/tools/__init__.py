@@ -21,11 +21,13 @@ from code_agent.tools import (
     grep_tool,
     read_tool,
     search_tool,
+    sub_agent_tool,
     time_tool,
     write_tool,
 )
 from code_agent.tools._manager import get_tool as _get_tool
 from code_agent.tools._manager import tools_for_gen_ai
+from code_agent.utils import print_tool_output
 
 __all__ = [
     "bash_tool",
@@ -35,6 +37,7 @@ __all__ = [
     "grep_tool",
     "read_tool",
     "search_tool",
+    "sub_agent_tool",
     "time_tool",
     "tools_for_gen_ai",
     "write_tool",
@@ -92,6 +95,9 @@ async def handle_function_tool_call(
     except Exception as e:
         current_span.set_status(StatusCode.ERROR, str(e))
         current_span.record_exception(e)
+        content = str(e)
+
+    print_tool_output(content, tool_name)
 
     return {
         "content": content,

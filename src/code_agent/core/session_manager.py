@@ -1,14 +1,14 @@
 import contextvars
 import json
-import logging
 import os
-from datetime import datetime
+from dataclasses import asdict
 from typing import Any
 
 from code_agent.core.config import get_config
 from code_agent.core.session import Session
+from code_agent.monitoring import get_logger
 
-logger = logging.getLogger()
+_logger = get_logger(__name__)
 
 
 class SessionManager:
@@ -22,11 +22,11 @@ class SessionManager:
         Args:
             sessions_dir: 会话存储文件夹路径
         """
-        logger.debug(f"初始化会话管理器, 存储目录: {sessions_dir}")
+        _logger.debug(f"初始化会话管理器, 存储目录: {sessions_dir}")
         self.sessions_dir = sessions_dir
         self.last_session_file = os.path.join(sessions_dir, "last_session.json")
         os.makedirs(sessions_dir, exist_ok=True)
-        logger.info("会话管理器初始化完成")
+        _logger.info("会话管理器初始化完成")
 
     def create_session(self) -> Session:
         """创建新会话
@@ -34,29 +34,27 @@ class SessionManager:
         Returns:
             会话实例
         """
-        session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-        logger.info(f"创建新会话: {session_id}")
-        session = Session(session_id)
+        session = Session()
+        _logger.info(f"创建新会话: {session.data.session_id}")
         self.save_session(session)
         return session
 
     def save_session(self, session: Session):
         """保存会话"""
-        logger.debug(f"保存会话: {session.session_id}")
-
-        session.updated_at = datetime.now().isoformat()
-        session_file = os.path.join(self.sessions_dir, f"{session.session_id}.json")
+        session_id = session.data.session_id
+        _logger.debug(f"保存会话: {session_id}")
+        session_file = os.path.join(self.sessions_dir, f"{session_id}.json")
 
         try:
             with open(session_file, "w", encoding="utf-8") as f:
-                json.dump(session.to_dict(), f, ensure_ascii=False, indent=2)
+                json.dump(asdict(session.data), f, ensure_ascii=False, indent=2)
 
             with open(self.last_session_file, "w", encoding="utf-8") as f:
-                json.dump({"last_session_id": session.session_id}, f)
+                json.dump({"last_session_id": session_id}, f)
 
-            logger.debug(f"会话 {session.session_id} 保存成功")
+            _logger.debug(f"会话 {session_id} 保存成功")
         except Exception as e:
-            logger.error(f"保存会话 {session.session_id} 失败: {e}", exc_info=True)
+            _logger.error(f"保存会话 {session_id} 失败: {e}", exc_info=True)
             raise
 
     def load_last_session(self) -> Session | None:
@@ -65,10 +63,9 @@ class SessionManager:
         Returns:
             会话实例或 None
         """
-        logger.debug("加载最后会话")
-
+        _logger.debug("加载最后会话")
         if not os.path.exists(self.last_session_file):
-            logger.debug("未找到 last_session.json")
+            _logger.warning("未找到 last_session.json")
             return None
 
         try:
@@ -76,10 +73,10 @@ class SessionManager:
                 data = json.load(f)
                 session_id = data.get("last_session_id")
                 if session_id:
-                    logger.info(f"加载会话: {session_id}")
+                    _logger.info(f"加载会话: {session_id}")
                     return self.load_session(session_id)
         except Exception as e:
-            logger.error(f"加载最后会话失败: {e}", exc_info=True)
+            _logger.error(f"加载最后会话失败: {e}", exc_info=True)
 
         return None
 
@@ -92,21 +89,21 @@ class SessionManager:
         Returns:
             是否成功加载
         """
-        logger.debug(f"加载指定会话: {session_id}")
+        _logger.debug(f"加载指定会话: {session_id}")
 
         session_file = os.path.join(self.sessions_dir, f"{session_id}.json")
         if not os.path.exists(session_file):
-            logger.warning(f"会话文件不存在: {session_file}")
+            _logger.warning(f"会话文件不存在: {session_file}")
             return None
 
         try:
             with open(session_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                session = Session.from_dict(data)
-            logger.debug(f"会话 {session_id} 加载成功")
+                session = Session.from_dict(**data)
+            _logger.debug(f"会话 {session_id} 加载成功")
             return session
         except Exception as e:
-            logger.error(f"加载会话 {session_id} 失败: {e}", exc_info=True)
+            _logger.error(f"加载会话 {session_id} 失败: {e}", exc_info=True)
             return None
 
     def delete_session(self, session_id: str) -> bool:
@@ -118,13 +115,13 @@ class SessionManager:
         Returns:
             是否成功删除
         """
-        logger.info(f"删除会话: {session_id}")
+        _logger.info(f"删除会话: {session_id}")
 
         session_file = os.path.join(self.sessions_dir, f"{session_id}.json")
         if os.path.exists(session_file):
             try:
                 os.remove(session_file)
-                logger.debug(f"会话文件已删除: {session_file}")
+                _logger.debug(f"会话文件已删除: {session_file}")
 
                 if os.path.exists(self.last_session_file):
                     try:
@@ -136,17 +133,17 @@ class SessionManager:
 
                                 with open(self.last_session_file, "w", encoding="utf-8") as f:
                                     json.dump({"last_session_id": new_last}, f)
-                                logger.debug(f"更新最后会话为: {new_last}")
+                                _logger.debug(f"更新最后会话为: {new_last}")
                     except Exception as e:
-                        logger.error(f"更新 last_session.json 失败: {e}", exc_info=True)
+                        _logger.error(f"更新 last_session.json 失败: {e}", exc_info=True)
 
-                logger.info(f"会话 {session_id} 删除成功")
+                _logger.info(f"会话 {session_id} 删除成功")
                 return True
             except Exception as e:
-                logger.error(f"删除会话 {session_id} 失败: {e}", exc_info=True)
+                _logger.error(f"删除会话 {session_id} 失败: {e}", exc_info=True)
                 return False
         else:
-            logger.warning(f"会话 {session_id} 不存在")
+            _logger.warning(f"会话 {session_id} 不存在")
             return False
 
     def get_session_list(self) -> list[dict[str, Any]]:

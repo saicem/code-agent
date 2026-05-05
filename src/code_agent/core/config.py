@@ -50,10 +50,11 @@ class LoggingConfig(BaseModel):
     otlp_enabled: bool = Field(default=False, description="是否启用 OTLP 导出器")
 
 
-class ReactConfig(BaseModel):
-    """ReAct 循环相关配置"""
+class EngineConfig(BaseModel):
+    """模型调用逻辑相关配置"""
 
-    max_cycles: int = Field(default=20, description="ReAct 最大循环次数")
+    max_cycles: int = Field(default=20, description="最大循环次数")
+    max_token: int = Field(default=3000, description="会话上下文最大 token 数量")
 
 
 class Config(BaseSettings):
@@ -72,7 +73,7 @@ class Config(BaseSettings):
     context: ContextConfig = Field(default_factory=ContextConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
-    react: ReactConfig = Field(default_factory=ReactConfig)
+    engine: EngineConfig = Field(default_factory=EngineConfig)
 
     @model_validator(mode="after")
     def _post_init(self) -> "Config":

@@ -9,8 +9,7 @@ import os
 
 from pydantic import BaseModel, Field
 
-from code_agent.core.exceptions import ToolException
-from code_agent.tools._manager import tool
+from code_agent.tools._manager import TOOL_TAG_CODE, tool
 from code_agent.utils.tool_util import (
     build_tool_response,
     validate_params,
@@ -34,6 +33,7 @@ def _do_search(pattern: str) -> list[str]:
     name="find_files_by_pattern",
     description="按文件名模式查找文件（支持通配符 * 和 ?）。适用于根据文件名或扩展名搜索本地文件。",
     param_type=GlobParams,
+    tags=[TOOL_TAG_CODE],
 )
 async def search_files(params: str) -> str:
     """搜索文件
@@ -44,19 +44,13 @@ async def search_files(params: str) -> str:
     Returns:
         JSON 格式的结果字符串
     """
-    try:
-        # 使用统一工具函数校验参数
-        validated_params = validate_params(params, GlobParams)
-        # 异步执行搜索
-        files = await asyncio.to_thread(_do_search, validated_params.pattern)
+    # 使用统一工具函数校验参数
+    validated_params = validate_params(params, GlobParams)
+    # 异步执行搜索
+    files = await asyncio.to_thread(_do_search, validated_params.pattern)
 
-        return build_tool_response(
-            True,
-            "搜索完成",
-            data={"files": files},
-        )
-
-    except ToolException as e:
-        return build_tool_response(False, str(e))
-    except Exception as e:
-        return build_tool_response(False, f"搜索文件失败: {e!s}")
+    return build_tool_response(
+        True,
+        "搜索完成",
+        data={"files": files},
+    )

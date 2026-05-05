@@ -1,68 +1,73 @@
 from code_agent.core.session_manager import SessionManager, current_session, get_session_manager
+from code_agent.utils import print_system_output
 
 
 def _show_session_help() -> None:
-    print("\n会话管理指令:")
-    print("  /session list      - 列出所有会话")
-    print("  /session switch <id> - 切换到指定会话")
-    print("  /session new       - 创建新会话")
-    print("  /session delete <id> - 删除指定会话")
-    print("  /session info      - 显示当前会话信息")
+    print_system_output("\n会话管理指令:", "info")
+    print_system_output("  /session list      - 列出所有会话", "info")
+    print_system_output("  /session switch <id> - 切换到指定会话", "info")
+    print_system_output("  /session new       - 创建新会话", "info")
+    print_system_output("  /session delete <id> - 删除指定会话", "info")
+    print_system_output("  /session info      - 显示当前会话信息", "info")
 
 
 def _handle_session_list(session_manager: SessionManager) -> None:
     sessions = session_manager.get_session_list()
     if not sessions:
-        print("\n没有找到任何会话")
+        print_system_output("\n没有找到任何会话", "info")
         return
 
-    print("\n会话列表:")
-    current_id = current_session.get().session_id
+    print_system_output("\n会话列表:", "info")
+    current_id = current_session.get().data.session_id
     for i, session in enumerate(sessions, 1):
         marker = "*" if session["id"] == current_id else " "
         created = session.get("created_at", "")[:19].replace("T", " ")
         updated = session.get("updated_at", "")[:19].replace("T", " ")
-        print(f"  {marker}{i}. {session['id']}")
-        print(f"       创建: {created}")
-        print(f"       更新: {updated}")
-        print(f"       消息: {session['message_count']} 条")
+        print_system_output(f"  {marker}{i}. {session['id']}", "info")
+        print_system_output(f"       创建: {created}", "info")
+        print_system_output(f"       更新: {updated}", "info")
+        print_system_output(f"       消息: {session['message_count']} 条", "info")
 
 
 def _handle_session_switch(session_manager: SessionManager, session_id: str) -> None:
     session = session_manager.load_session(session_id)
     if session:
         current_session.set(session)
-        print(f"\n已切换到会话: {session_id}")
+        print_system_output(f"\n已切换到会话: {session_id}", "info")
     else:
-        print(f"\n错误: 无法找到会话 {session_id}")
+        print_system_output(f"\n错误: 无法找到会话 {session_id}", "error")
 
 
 def _handle_session_new(session_manager: SessionManager) -> None:
     session = session_manager.create_session()
     current_session.set(session)
-    print(f"\n已创建新会话: {session.session_id}")
+    print_system_output(f"\n已创建新会话: {session.data.session_id}", "info")
 
 
 def _handle_session_delete(session_manager: SessionManager, session_id: str) -> None:
     if session_manager.delete_session(session_id):
-        print(f"\n已删除会话: {session_id}")
-        if current_session.get().session_id == session_id:
+        print_system_output(f"\n已删除会话: {session_id}", "info")
+        if current_session.get().data.session_id == session_id:
             session = session_manager.create_session()
             current_session.set(session)
-            print(f"已创建新会话: {session.session_id}")
+            print_system_output(f"已创建新会话: {session.data.session_id}", "info")
     else:
-        print(f"\n错误: 无法找到会话 {session_id}")
+        print_system_output(f"\n错误: 无法找到会话 {session_id}", "error")
 
 
 def _handle_session_info(session_manager: SessionManager) -> None:
-    print("\n当前会话信息:")
-    print(current_session.get().get_summary())
+    session = current_session.get()
+    print_system_output("\n当前会话信息:", "info")
+    print_system_output(f"  会话ID: {session.data.session_id}", "info")
+    print_system_output(f"  创建时间: {session.data.created_at[:19].replace('T', ' ')}", "info")
+    print_system_output(f"  更新时间: {session.data.updated_at[:19].replace('T', ' ')}", "info")
+    print_system_output(f"  消息数量: {len(session.data.messages)}", "info")
 
 
 def _handle_session(command: str) -> None:
     session_manager = get_session_manager()
     if not session_manager:
-        print("\n错误: 会话管理器未初始化")
+        print_system_output("\n错误: 会话管理器未初始化", "error")
         return
 
     cmd_parts = command.split(" ", 2)
@@ -76,7 +81,7 @@ def _handle_session(command: str) -> None:
         _handle_session_list(session_manager)
     elif sub_cmd == "switch":
         if len(cmd_parts) < 3:
-            print("\n用法: /session switch <会话ID>")
+            print_system_output("\n用法: /session switch <会话ID>", "info")
             return
         session_id = cmd_parts[2].strip()
         _handle_session_switch(session_manager, session_id)
@@ -84,7 +89,7 @@ def _handle_session(command: str) -> None:
         _handle_session_new(session_manager)
     elif sub_cmd == "delete":
         if len(cmd_parts) < 3:
-            print("\n用法: /session delete <会话ID>")
+            print_system_output("\n用法: /session delete <会话ID>", "info")
             return
         session_id = cmd_parts[2].strip()
         _handle_session_delete(session_manager, session_id)

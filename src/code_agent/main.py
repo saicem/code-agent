@@ -7,12 +7,12 @@ import asyncio
 
 import code_agent._setup  # noqa: F401
 from code_agent.agent import prompt
-from code_agent.agent.engine import execute_reasoning_acting
-from code_agent.agent.gate import ModelGate
+from code_agent.agent.engine import plan_and_execute
+from code_agent.agent.gate import get_gate
 from code_agent.commands import handle_command
-from code_agent.core.config import get_config
 from code_agent.core.session_manager import current_session, get_session_manager
 from code_agent.monitoring import get_logger, get_tracer
+from code_agent.utils import get_user_input, print_system_output
 
 _logger = get_logger(__name__)
 _tracer = get_tracer(__name__)
@@ -20,7 +20,6 @@ _tracer = get_tracer(__name__)
 
 async def main():
     _logger.info("========== Code Agent 启动中 ==========")
-    config = get_config()
     session_manager = get_session_manager()
 
     session = session_manager.load_last_session()
@@ -28,15 +27,13 @@ async def main():
         session = session_manager.create_session()
     current_session.set(session)
 
-    # print("记忆摘要:")
-    # print(container.memory_manager.get_summary())
-    print("请输入任务描述，输入 '/quit' 退出，输入 '/help' 查看可用指令")
+    print_system_output("请输入任务描述，输入 '/quit' 退出，输入 '/help' 查看可用指令", "info")
 
-    gate = ModelGate(config.gate)
+    gate = get_gate()
 
     # 循环对话
     while True:
-        task = input("\n任务: ")
+        task = get_user_input("\n任务: ")
 
         if task.strip() == "":
             continue
@@ -48,14 +45,14 @@ async def main():
 
         # 执行任务
         session = current_session.get()
-        session.set_system_prompt(prompt.code_system)
+        session.set_system_prompt(prompt.PLAN_AND_EXECUTE_SYSTEM)
         session.add_user_message(task)
 
         try:
-            await execute_reasoning_acting(gate, session, config.react)
+            await plan_and_execute(gate, session)
         except Exception as e:
             _logger.error(f"任务执行失败: {e}", exc_info=True)
-            print(f"执行错误: {e}")
+            print_system_output(f"执行错误: {e}", "error")
             continue
 
         session_manager.save_session(session)

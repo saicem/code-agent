@@ -9,8 +9,7 @@ import re
 
 from pydantic import BaseModel, Field
 
-from code_agent.core.exceptions import ToolException
-from code_agent.tools._manager import tool
+from code_agent.tools._manager import TOOL_TAG_CODE, tool
 from code_agent.utils.tool_util import (
     build_full_path,
     build_tool_response,
@@ -70,6 +69,7 @@ def _do_search(full_path: str, pattern: str, file_pattern: str) -> list[dict]:
     name="search_text_in_files",
     description="在本地文件中搜索包含指定文本内容的文件（正则表达式）。适用于查找包含特定代码、字符串的文件。",
     param_type=GrepParams,
+    tags=[TOOL_TAG_CODE],
 )
 async def search_content(params: str) -> str:
     """搜索内容
@@ -80,33 +80,27 @@ async def search_content(params: str) -> str:
     Returns:
         JSON 格式的结果字符串
     """
-    try:
-        # 使用统一工具函数校验参数
-        validated_params = validate_params(params, GrepParams)
-        full_path = build_full_path(validated_params.path or ".")
+    # 使用统一工具函数校验参数
+    validated_params = validate_params(params, GrepParams)
+    full_path = build_full_path(validated_params.path or ".")
 
-        # 检查目录是否存在
-        if not os.path.exists(full_path):
-            return build_tool_response(
-                False,
-                f"搜索路径不存在: {full_path}",
-            )
-
-        # 异步执行搜索
-        results = await asyncio.to_thread(
-            _do_search,
-            full_path,
-            validated_params.pattern,
-            validated_params.file_pattern,
-        )
-
+    # 检查目录是否存在
+    if not os.path.exists(full_path):
         return build_tool_response(
-            True,
-            "搜索完成",
-            data={"results": results},
+            False,
+            f"搜索路径不存在: {full_path}",
         )
 
-    except ToolException as e:
-        return build_tool_response(False, str(e))
-    except Exception as e:
-        return build_tool_response(False, f"搜索内容失败: {e!s}")
+    # 异步执行搜索
+    results = await asyncio.to_thread(
+        _do_search,
+        full_path,
+        validated_params.pattern,
+        validated_params.file_pattern,
+    )
+
+    return build_tool_response(
+        True,
+        "搜索完成",
+        data={"results": results},
+    )

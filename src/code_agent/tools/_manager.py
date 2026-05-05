@@ -6,7 +6,8 @@
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable
+from functools import cache
+from typing import Callable, Iterable
 
 from openai.types.chat import (
     ChatCompletionFunctionToolParam,
@@ -15,36 +16,50 @@ from openai.types.chat import (
 from pydantic import BaseModel, TypeAdapter
 
 from code_agent import monitoring
+from code_agent.core.exceptions import SystemException
 
 _logger = monitoring.get_logger(__name__)
+
+TOOL_TAG_CODE = "code"
+TOOL_TAG_PLAN = "plan"
 
 
 @dataclass
 class ToolInfo:
     """工具信息"""
 
-    func: Callable[..., Any]
+    name: str
+    description: str
+    param_type: type[BaseModel]
+    func: Callable
     is_async: bool
 
 
 _registered_tools: dict[str, ToolInfo] = {}
-_tools_info: dict[str, ChatCompletionToolUnionParam] = {}
+_tags_tool_map: dict[str, list[str]] = {}
 
 
 def _register_tool[T: Callable](
-    name: str, description: str, param_type: type[BaseModel], func: T
+    name: str, description: str, param_type: type[BaseModel], tags: list[str], func: T
 ) -> None:
     is_async = asyncio.iscoroutinefunction(func)
-    _registered_tools[name] = ToolInfo(
+    tool_info = ToolInfo(
+        name=name,
+        description=description,
+        param_type=param_type,
         func=func,
         is_async=is_async,
     )
-    _tools_info[name] = _build_tool_info(name, description, param_type)
+    _registered_tools[name] = tool_info
+    for tag in tags:
+        _tags_tool_map.setdefault(tag, []).append(name)
 
 
-def tool[T: Callable](name: str, description: str, param_type: type[BaseModel]) -> Callable[[T], T]:
+def tool[T: Callable](
+    name: str, description: str, param_type: type[BaseModel], tags: list[str]
+) -> Callable[[T], T]:
     def decorator(func: T) -> T:
-        _register_tool(name, description, param_type, func)
+        _register_tool(name, description, param_type, tags, func)
         return func
 
     return decorator
@@ -62,13 +77,21 @@ def get_tool(tool_name: str) -> ToolInfo | None:
     return _registered_tools.get(tool_name)
 
 
-def tools_for_gen_ai() -> Iterable[ChatCompletionToolUnionParam]:
+@cache
+def tools_for_gen_ai(tag: str) -> Iterable[ChatCompletionToolUnionParam]:
     """获取所有注册的工具信息
 
     Returns:
         工具信息列表
     """
-    return _tools_info.values()
+    tools = _tags_tool_map.get(tag)
+    if tools is None:
+        raise SystemException(f"未注册标签 {tag} 的工具")
+    result = []
+    for tool_name in tools:
+        tool_info = _registered_tools[tool_name]
+        result.append(_build_tool_info(tool_info.name, tool_info.description, tool_info.param_type))
+    return result
 
 
 def _build_tool_info(

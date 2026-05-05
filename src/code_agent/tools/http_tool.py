@@ -10,8 +10,7 @@ from typing import Any, Dict, Optional
 import httpx
 from pydantic import BaseModel, Field
 
-from code_agent.core.exceptions import ToolException
-from code_agent.tools._manager import tool
+from code_agent.tools._manager import TOOL_TAG_CODE, TOOL_TAG_PLAN, tool
 from code_agent.utils.tool_util import (
     build_tool_response,
     validate_params,
@@ -35,6 +34,7 @@ class HttpRequestParams(BaseModel):
     name="send_http_request",
     description="发送 HTTP 请求到指定 URL。适用于调用 API 或获取网页源码。",
     param_type=HttpRequestParams,
+    tags=[TOOL_TAG_CODE, TOOL_TAG_PLAN],
 )
 async def http_request(params: str) -> str:
     """发送 HTTP 请求
@@ -45,57 +45,49 @@ async def http_request(params: str) -> str:
     Returns:
         JSON 格式的结果字符串
     """
-    try:
-        # 使用统一工具函数校验参数
-        validated_params = validate_params(params, HttpRequestParams)
+    # 使用统一工具函数校验参数
+    validated_params = validate_params(params, HttpRequestParams)
 
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(validated_params.timeout),
-            follow_redirects=validated_params.allow_redirects,
-        ) as client:
-            method = validated_params.method.upper()
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(validated_params.timeout),
+        follow_redirects=validated_params.allow_redirects,
+    ) as client:
+        method = validated_params.method.upper()
 
-            # 构建请求参数
-            request_kwargs: Dict[str, Any] = {
+        # 构建请求参数
+        request_kwargs: Dict[str, Any] = {
+            "url": validated_params.url,
+        }
+
+        if validated_params.headers:
+            request_kwargs["headers"] = validated_params.headers
+
+        if validated_params.params:
+            request_kwargs["params"] = validated_params.params
+
+        if validated_params.json:
+            request_kwargs["json"] = validated_params.json
+        elif validated_params.data:
+            request_kwargs["data"] = validated_params.data
+
+        # 根据方法发送请求
+        response = await client.request(method, **request_kwargs)
+
+        # 获取响应内容
+        try:
+            response_data = response.json()
+        except ValueError:
+            response_data = response.text
+
+        return build_tool_response(
+            True,
+            f"请求成功，状态码: {response.status_code}",
+            data={
                 "url": validated_params.url,
-            }
-
-            if validated_params.headers:
-                request_kwargs["headers"] = validated_params.headers
-
-            if validated_params.params:
-                request_kwargs["params"] = validated_params.params
-
-            if validated_params.json:
-                request_kwargs["json"] = validated_params.json
-            elif validated_params.data:
-                request_kwargs["data"] = validated_params.data
-
-            # 根据方法发送请求
-            response = await client.request(method, **request_kwargs)
-
-            # 获取响应内容
-            try:
-                response_data = response.json()
-            except ValueError:
-                response_data = response.text
-
-            return build_tool_response(
-                True,
-                f"请求成功，状态码: {response.status_code}",
-                data={
-                    "url": validated_params.url,
-                    "method": method,
-                    "status_code": response.status_code,
-                    "headers": dict(response.headers),
-                    "content": response_data,
-                    "encoding": response.encoding,
-                },
-            )
-
-    except ToolException as e:
-        return build_tool_response(False, str(e))
-    except httpx.HTTPError as e:
-        return build_tool_response(False, f"HTTP 请求失败: {e!s}")
-    except Exception as e:
-        return build_tool_response(False, f"请求失败: {e!s}")
+                "method": method,
+                "status_code": response.status_code,
+                "headers": dict(response.headers),
+                "content": response_data,
+                "encoding": response.encoding,
+            },
+        )

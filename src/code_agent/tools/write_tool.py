@@ -26,8 +26,8 @@ class WriteParams(BaseModel):
 
 
 @tool(
-    name="write_file",
-    description="写入文件内容到指定路径。当你需要创建或修改文件时使用此工具。",
+    name="create_or_overwrite_file",
+    description="将内容写入指定路径的文件（默认覆盖现有文件）。适用于创建新文件或完全重写现有文件的场景，区别于局部修改。",
     param_type=WriteParams,
 )
 def write_file(params: str) -> str:

@@ -5,11 +5,10 @@ import os
 from datetime import datetime
 from typing import Any
 
+from code_agent.core.config import get_config
 from code_agent.core.session import Session
 
 logger = logging.getLogger()
-
-current_session = contextvars.ContextVar[Session]("current_session")
 
 
 class SessionManager:
@@ -177,3 +176,11 @@ class SessionManager:
         # 按更新时间排序
         sessions.sort(key=lambda x: x["updated_at"], reverse=True)
         return sessions
+
+
+current_session = contextvars.ContextVar[Session]("current_session")
+_session_manager = SessionManager(get_config().storage.sessions_dir)
+
+
+def get_session_manager() -> SessionManager:
+    return _session_manager

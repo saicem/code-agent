@@ -23,8 +23,8 @@ class SearchParams(BaseModel):
 
 
 @tool(
-    name="search_web",
-    description="搜索网络内容。当你需要获取最新信息或外部知识时使用此工具。",
+    name="web_search",
+    description="通过搜索引擎搜索互联网内容，获取最新资讯、技术文档、外部知识等。适用于需要查找外部信息的场景，区别于本地文件搜索。",
     param_type=SearchParams,
 )
 async def search_web(params: str) -> str:

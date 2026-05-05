@@ -23,8 +23,8 @@ class TimeParams(BaseModel):
 
 
 @tool(
-    name="get_current_time",
-    description="获取当前时间。当你需要知道当前时间或处理与时间相关的问题时调用此工具。",
+    name="retrieve_current_time",
+    description="获取当前系统时间。适用于需要时间戳、日志记录或时间相关计算的场景。",
     param_type=TimeParams,
 )
 async def get_current_time(params: str) -> str:

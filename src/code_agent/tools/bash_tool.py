@@ -24,8 +24,8 @@ class BashParams(BaseModel):
 
 
 @tool(
-    name="run_bash",
-    description="执行终端命令，例如删除文件、移动文件、查看目录结构等",
+    name="execute_command",
+    description="执行系统终端命令（如删除、移动、复制文件，查看目录结构，运行程序等）。适用于需要操作系统层面操作的场景。",
     param_type=BashParams,
 )
 async def run_bash(params: str) -> str:

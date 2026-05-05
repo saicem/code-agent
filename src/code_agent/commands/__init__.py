@@ -1,9 +1,8 @@
-from code_agent.monitoring import get_tracer
 from typing import Any, Callable
 
 from code_agent.commands.session import register_session_commands
 from code_agent.commands.system import register_system_commands
-
+from code_agent.monitoring import get_tracer
 
 tracer = get_tracer(__name__)
 

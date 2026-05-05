@@ -27,8 +27,8 @@ class EditParams(BaseModel):
 
 
 @tool(
-    name="edit_file",
-    description="精确替换文件中的部分内容",
+    name="modify_file_content",
+    description="精确替换文件中的指定文本内容。需要提供旧字符串和新字符串，适用于对已有文件进行局部修改的场景，区别于覆盖式写入。",
     param_type=EditParams,
 )
 async def edit_file(params: str) -> str:

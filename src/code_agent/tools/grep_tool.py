@@ -67,8 +67,8 @@ def _do_search(full_path: str, pattern: str, file_pattern: str) -> list[dict]:
 
 
 @tool(
-    name="search_content",
-    description="按内容搜索文件",
+    name="search_text_in_files",
+    description="在本地文件中搜索包含指定文本内容的文件（正则表达式）。适用于查找包含特定代码、字符串的文件。",
     param_type=GrepParams,
 )
 async def search_content(params: str) -> str:

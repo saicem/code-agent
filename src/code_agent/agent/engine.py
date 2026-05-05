@@ -12,7 +12,7 @@ from code_agent.tools import (
     tools_for_gen_ai,
 )
 
-_tracer = monitoring.get_tracer("react_engine")
+_tracer = monitoring.get_tracer(__name__)
 _logger = monitoring.get_logger(__name__)
 
 

@@ -32,11 +32,8 @@ class HttpRequestParams(BaseModel):
 
 
 @tool(
-    name="http_request",
-    description=(
-        "发送 HTTP 请求到指定 URL。适用于调用 API 接口、获取网页内容等场景。"
-        "区别于网络搜索工具，此工具需要明确指定目标地址。"
-    ),
+    name="send_http_request",
+    description="发送 HTTP 请求到指定 URL。适用于调用 API 或获取网页源码。",
     param_type=HttpRequestParams,
 )
 async def http_request(params: str) -> str:

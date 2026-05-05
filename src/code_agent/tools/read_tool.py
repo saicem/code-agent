@@ -25,8 +25,8 @@ class ReadParams(BaseModel):
 
 
 @tool(
-    name="read_file",
-    description="读取指定文件的内容。当你需要查看文件内容时使用此工具。",
+    name="read_file_content",
+    description="读取指定本地文件的全部内容。适用于查看文件内容、获取代码或文档内容的场景。",
     param_type=ReadParams,
 )
 async def read_file(params: str) -> str:

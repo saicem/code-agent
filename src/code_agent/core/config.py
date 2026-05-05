@@ -109,11 +109,8 @@ class Config(BaseSettings):
         makedirs(self.storage.sessions_dir, exist_ok=True)
 
 
-_config: Config | None = None
+_config = Config()
 
 
 def get_config() -> Config:
-    global _config
-    if not _config:
-        _config = Config()
     return _config

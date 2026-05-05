@@ -10,9 +10,10 @@ from openai.types.chat import (
     ChatCompletionToolMessageParam,
 )
 from opentelemetry import trace
+from opentelemetry.semconv._incubating.attributes import gen_ai_attributes
 from opentelemetry.trace.status import StatusCode
 
-from code_agent.core.di import container
+from code_agent.monitoring import get_tracer
 from code_agent.tools import (
     bash_tool,
     edit_tool,
@@ -39,8 +40,10 @@ __all__ = [
     "write_tool",
 ]
 
+_tracer = get_tracer(__name__)
 
-@container.tracer.start_as_current_span("handle_tool_calls")
+
+@_tracer.start_as_current_span("handle_tool_calls")
 async def handle_tool_calls(
     tool_calls: list[ChatCompletionMessageToolCallUnion],
 ) -> list[ChatCompletionToolMessageParam]:
@@ -55,7 +58,7 @@ async def handle_tool_calls(
     return result
 
 
-@container.tracer.start_as_current_span("handle_function_tool_call")
+@_tracer.start_as_current_span("handle_function_tool_call")
 async def handle_function_tool_call(
     tool_call: ChatCompletionMessageFunctionToolCall,
 ) -> ChatCompletionToolMessageParam:
@@ -64,9 +67,10 @@ async def handle_function_tool_call(
     tool_name = tool_call.function.name
     current_span.set_attributes(
         {
-            "tool.name": tool_name,
-            "tool.call_id": tool_call.id,
-            "tool.arguments": tool_call.function.arguments,
+            gen_ai_attributes.GEN_AI_OPERATION_NAME: gen_ai_attributes.GenAiOperationNameValues.EXECUTE_TOOL.value,
+            "gen_ai.tool.name": tool_name,
+            "gen_ai.tool.call_id": tool_call.id,
+            "gen_ai.tool.arguments": tool_call.function.arguments,
         }
     )
 
@@ -87,7 +91,7 @@ async def handle_function_tool_call(
         current_span.set_status(StatusCode.OK)
     except Exception as e:
         current_span.set_status(StatusCode.ERROR, str(e))
-        raise
+        current_span.record_exception(e)
 
     return {
         "content": content,

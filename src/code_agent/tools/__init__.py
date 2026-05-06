@@ -4,6 +4,8 @@
 包含各种工具的定义和实现
 """
 
+import asyncio
+
 from openai.types.chat import (
     ChatCompletionMessageFunctionToolCall,
     ChatCompletionMessageToolCallUnion,
@@ -54,16 +56,13 @@ async def handle_tool_calls(
 ) -> list[ChatCompletionToolMessageParam]:
     """处理多个工具调用"""
     _logger.info(f"开始处理 {len(tool_calls)} 个工具调用")
-    from typing import cast
-
-    result: list[ChatCompletionToolMessageParam] = []
-    for i, tool_call in enumerate(tool_calls):
-        if tool_call.type == "custom":
-            _logger.debug(f"跳过自定义工具调用 #{i}")
-            continue
-        func_call = cast(ChatCompletionMessageFunctionToolCall, tool_call)
-        _logger.debug(f"处理工具调用 #{i}: {func_call.function.name}")
-        result.append(await handle_function_tool_call(func_call))
+    func_tool_calls: list[ChatCompletionMessageFunctionToolCall] = list(
+        filter(lambda x: x.type == "function", tool_calls)
+    )
+    _logger.debug(f"筛选出 {len(func_tool_calls)} 个函数工具调用")
+    result = await asyncio.gather(
+        *[handle_function_tool_call(func_call) for func_call in func_tool_calls]
+    )
     _logger.info(f"工具调用处理完成，共 {len(result)} 个结果")
     return result
 

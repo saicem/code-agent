@@ -24,7 +24,7 @@ from code_agent.tools import (
     handle_tool_calls,
     tools_for_gen_ai,
 )
-from code_agent.utils import print_model_output
+from code_agent.utils import print_model_output, print_system_output
 
 _tracer = monitoring.get_tracer(__name__)
 _logger = monitoring.get_logger(__name__)
@@ -117,6 +117,7 @@ async def _compress_session(
     session: Session,
     gate: GenAiGate = Provide[Container.gate],
 ) -> None:
+    print_system_output("压缩会话中...")
     span = trace.get_current_span()
     _logger.info(f"压缩会话: {session.data.session_id} 总token: {session.data.total_token}")
     session.add_user_message(COMPRESS_USER_CALL_MESSAGE)
@@ -166,6 +167,7 @@ async def _compress_session(
                 )
 
             _logger.info(f"会话 {session.data.session_id} 压缩完成")
+            print_system_output("压缩会话完成")
             break
 
         except Exception as e:

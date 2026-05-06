@@ -25,7 +25,7 @@ class HttpRequestParams(BaseModel):
     headers: Optional[dict[str, str]] = Field(None, description="请求头字典，可选")
     params: Optional[dict[str, str]] = Field(None, description="URL 查询参数，可选")
     data: Optional[dict[str, Any]] = Field(None, description="POST 请求体数据，可选")
-    json: Optional[dict[str, Any]] = Field(None, description="JSON 请求体，可选")
+    json_data: Optional[dict[str, Any]] = Field(None, description="JSON 请求体，可选")
     timeout: int = Field(30, description="请求超时时间（秒），默认为 30")
     allow_redirects: bool = Field(True, description="是否允许重定向，默认为 True")
 
@@ -65,8 +65,8 @@ async def http_request(params: str) -> str:
         if validated_params.params:
             request_kwargs["params"] = validated_params.params
 
-        if validated_params.json:
-            request_kwargs["json"] = validated_params.json
+        if validated_params.json_data:
+            request_kwargs["json"] = validated_params.json_data
         elif validated_params.data:
             request_kwargs["data"] = validated_params.data
 

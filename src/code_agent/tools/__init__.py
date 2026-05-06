@@ -13,7 +13,7 @@ from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes import gen_ai_attributes
 from opentelemetry.trace.status import StatusCode
 
-from code_agent.monitoring import get_tracer, get_logger
+from code_agent.monitoring import get_logger, get_tracer
 from code_agent.tools import (
     bash_tool,
     edit_tool,

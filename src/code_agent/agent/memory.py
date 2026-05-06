@@ -7,7 +7,6 @@
 **核心要求**：所有文档必须写入文件，确保持久化存储
 - 用户偏好：.memo/preference.md
 - 项目总览：.memo/project.md
-- 模块文档：.memo/ref/module_xxx.md
 """
 
 import json
@@ -17,10 +16,6 @@ from typing import List, Tuple
 
 from pydantic import BaseModel
 
-from code_agent.agent.engine import reasoning_acting
-from code_agent.agent.prompt import MEMORY_CONTEXT_SYSTEM
-from code_agent.agent.session import Session
-from code_agent.agent.session_manager import get_session_manager
 from code_agent.core.config import get_config
 from code_agent.monitoring import get_logger, get_tracer
 from code_agent.utils import print_system_output
@@ -45,6 +40,33 @@ _PREFERENCE_FILE = os.path.join(_MEMO_DIR, "preference.md")
 _FILE_UPDATE_FILE = os.path.join(_MEMO_DIR, "file_update.json")
 _file_ignore_spec = get_pathspec_from_gitignore(".gitignore") or DEFAULT_IGNORE_SPEC
 os.makedirs(os.path.join(_MEMO_DIR, "ref"), exist_ok=True)
+
+
+def save_compressed_data(user_preferences: str, project_context: str) -> None:
+    """将用户偏好和项目情况持久化到文件
+
+    Args:
+        user_preferences: 用户偏好内容
+        project_context: 项目情况内容
+    """
+
+    # 保存用户偏好
+    if user_preferences:
+        try:
+            with open(_PREFERENCE_FILE, "w", encoding="utf-8") as f:
+                f.write(user_preferences)
+            _logger.debug(f"用户偏好已保存到: {_PREFERENCE_FILE}")
+        except Exception as e:
+            _logger.error(f"保存用户偏好失败: {e}", exc_info=True)
+
+    # 保存项目情况
+    if project_context:
+        try:
+            with open(_PROJECT_FILE, "w", encoding="utf-8") as f:
+                f.write(project_context)
+            _logger.debug(f"项目情况已保存到: {_PROJECT_FILE}")
+        except Exception as e:
+            _logger.error(f"保存项目情况失败: {e}", exc_info=True)
 
 
 @_tracer.start_as_current_span("load_memory")
@@ -83,9 +105,9 @@ def load_memory() -> str:
 <user_preferences>
 {preference_content}
 </user_preferences>
-<project_info>
+<project_context>
 {project_content}
-</project_info>
+</project_context>
 """
 
     _logger.info(f"记忆文件加载完成，总长度: {len(memory)}")
@@ -173,56 +195,3 @@ def _detect_file_changes(
             _logger.debug("未检测到文件变更")
 
     return added_files, updated_files, deleted_files
-
-
-@_tracer.start_as_current_span("update_memory")
-async def update_memory() -> None:
-    """
-    检测项目文件变更并更新文档
-    """
-
-    # 加载上次记录
-    last_file_update_data = _load_file_updates()
-
-    # 遍历获取目录下所有文件，过滤 _file_ignore_spec 中的文件，得到文件以及上次修改时间戳
-    _logger.debug("开始扫描项目文件")
-    file_updates: dict[str, float] = {}
-    for f in _file_ignore_spec.match_tree_files(".", negate=True):
-        file_updates[f] = os.path.getmtime(f)
-    _logger.debug(f"扫描完成，共发现 {len(file_updates)} 个文件")
-
-    session = Session()
-    session.data.session_id = "memory_update" + session.data.session_id
-    session.set_system_prompt(MEMORY_CONTEXT_SYSTEM)
-
-    if last_file_update_data is None:
-        _logger.info("首次运行，需要重建文档")
-        print_system_output("首次运行，正在重建文档...", "info")
-        session.add_user_message("你需要读取整个项目来重建文档")
-        await reasoning_acting(session, "code")
-        _logger.info("文档重建完成")
-        print_system_output("文档重建完成", "success")
-
-    else:
-        # 检测文件变更
-        added_files, updated_files, deleted_files = _detect_file_changes(
-            file_updates, last_file_update_data
-        )
-        if len(added_files) > 0 or len(updated_files) > 0 or len(deleted_files) > 0:
-            _logger.info("存在文件变更，需要更新文档")
-            print_system_output("正在更新文档...", "info")
-            session.add_user_message(
-                f"以下文件发生了变化。新增: {added_files}, 更新: {updated_files}, 删除: {deleted_files}。根据文件变更修改文档。"
-            )
-            await reasoning_acting(session, "code")
-            _logger.info("文档更新完成")
-            print_system_output("文档更新完成", "success")
-        else:
-            _logger.info("未检测到文件变更，无需更新文档")
-            print_system_output("未检测到文件变更", "info")
-
-    # 保存文件更新记录
-    get_session_manager().save_session(session)
-    _save_file_updates(FileUpdateData(files=file_updates))
-    _logger.info("记忆更新完成")
-    print_system_output("记忆更新完成", "success")

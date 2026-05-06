@@ -5,7 +5,7 @@ HTTP 请求工具
 区别于网络搜索工具，此工具可直接请求指定的 API 或网页
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import httpx
 from pydantic import BaseModel, Field
@@ -22,10 +22,10 @@ class HttpRequestParams(BaseModel):
 
     url: str = Field(..., description="请求的目标 URL")
     method: str = Field("GET", description="HTTP 方法，支持 GET、POST、PUT、DELETE，默认为 GET")
-    headers: Optional[Dict[str, str]] = Field(None, description="请求头字典，可选")
-    params: Optional[Dict[str, str]] = Field(None, description="URL 查询参数，可选")
-    data: Optional[Dict[str, Any]] = Field(None, description="POST 请求体数据，可选")
-    json: Optional[Dict[str, Any]] = Field(None, description="JSON 请求体，可选")
+    headers: Optional[dict[str, str]] = Field(None, description="请求头字典，可选")
+    params: Optional[dict[str, str]] = Field(None, description="URL 查询参数，可选")
+    data: Optional[dict[str, Any]] = Field(None, description="POST 请求体数据，可选")
+    json: Optional[dict[str, Any]] = Field(None, description="JSON 请求体，可选")
     timeout: int = Field(30, description="请求超时时间（秒），默认为 30")
     allow_redirects: bool = Field(True, description="是否允许重定向，默认为 True")
 
@@ -55,7 +55,7 @@ async def http_request(params: str) -> str:
         method = validated_params.method.upper()
 
         # 构建请求参数
-        request_kwargs: Dict[str, Any] = {
+        request_kwargs: dict[str, Any] = {
             "url": validated_params.url,
         }
 

@@ -4,6 +4,8 @@ import os
 from dataclasses import asdict
 from typing import Any
 
+from code_agent.agent.memory import load_memory
+from code_agent.agent.prompt import CODE_SYSTEM
 from code_agent.agent.session import Session
 from code_agent.core.config import get_config
 from code_agent.monitoring import get_logger
@@ -35,6 +37,7 @@ class SessionManager:
             会话实例
         """
         session = Session()
+        session.set_system_prompt(CODE_SYSTEM + load_memory())
         _logger.info(f"创建新会话: {session.data.session_id}")
         self.save_session(session)
         return session

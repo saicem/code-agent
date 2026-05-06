@@ -50,7 +50,7 @@ class EngineConfig(BaseModel):
     """模型调用逻辑相关配置"""
 
     max_cycles: int = Field(default=20, description="最大循环次数")
-    max_token: int = Field(default=8000, description="会话上下文最大 token 数量")
+    max_token: int = Field(default=200_000, description="会话上下文最大 token 数量")
 
 
 class Config(BaseSettings):

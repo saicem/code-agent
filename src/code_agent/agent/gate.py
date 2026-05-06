@@ -39,6 +39,7 @@ class GenAiGate:
                 model=self._model,
                 messages=messages,
                 tools=tools,
+                reasoning_effort="low",
             )
             _logger.debug(f"模型调用成功，响应ID: {result.id}")
             return result
@@ -50,5 +51,5 @@ class GenAiGate:
 _gate = GenAiGate(get_config().gate)
 
 
-def get_gate():
+def get_gate() -> GenAiGate:
     return _gate

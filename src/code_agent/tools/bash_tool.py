@@ -55,13 +55,19 @@ async def run_bash(params: str) -> str:
 
     stdout_bytes, stderr_bytes = await asyncio.wait_for(process.communicate(), timeout=30)
 
-    # 尝试解码输出
-    try:
-        stdout = stdout_bytes.decode("utf-8")
-        stderr = stderr_bytes.decode("utf-8")
-    except UnicodeDecodeError:
-        stdout = stdout_bytes.decode()
-        stderr = stderr_bytes.decode()
+    # 尝试解码输出，支持多种编码
+    def decode_output(bytes_data: bytes) -> str:
+        encodings = ["utf-8", "gbk", "cp1252", "latin-1"]
+        for encoding in encodings:
+            try:
+                return bytes_data.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        # 最后使用 ignore 策略处理无法解码的字节
+        return bytes_data.decode("utf-8", errors="replace")
+
+    stdout = decode_output(stdout_bytes)
+    stderr = decode_output(stderr_bytes)
 
     return build_tool_response(
         process.returncode == 0,

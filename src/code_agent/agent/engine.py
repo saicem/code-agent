@@ -3,17 +3,21 @@
 思考引擎模块
 """
 
+import re
+
 from openai.types.chat import ChatCompletionMessageToolCallUnion
 from opentelemetry import trace
+from opentelemetry.trace.status import StatusCode
 
 from code_agent import monitoring
 from code_agent.agent.gate import get_gate
+from code_agent.agent.memory import save_compressed_data
 from code_agent.agent.prompt import (
-    COMPRESS_SYSTEM,
     COMPRESS_USER_CALL_MESSAGE,
 )
 from code_agent.agent.session import Session
 from code_agent.core.config import get_config
+from code_agent.core.exceptions import SystemException
 from code_agent.tools import (
     handle_tool_calls,
     tools_for_gen_ai,
@@ -27,6 +31,14 @@ _engine_config = get_config().engine
 
 @_tracer.start_as_current_span("reasoning_acting")
 async def reasoning_acting(session: Session, tag: str) -> None:
+    try:
+        await _reasoning_acting(session, tag)
+    except Exception as e:
+        _logger.error(f"ReAct 循环执行失败: {e}", exc_info=True)
+        raise
+
+
+async def _reasoning_acting(session: Session, tag: str) -> None:
     span = trace.get_current_span()
     span.set_attribute("gen_ai.tool.tag", tag)
     span.set_attribute("gen_ai.session_id", session.data.session_id)
@@ -72,33 +84,87 @@ async def plan_and_execute(
     await reasoning_acting(session, "plan")
 
 
+def _extract_xml_tags(content: str) -> dict[str, str]:
+    """从内容中提取 XML 标签内容
+
+    Args:
+        content: 包含 XML 标签的内容
+
+    Returns:
+        包含各标签内容的字典
+    """
+    tags = ["user_preferences", "project_context", "current_task"]
+    result: dict[str, str] = {}
+
+    for tag in tags:
+        pattern = f"<{tag}>(.*?)</{tag}>"
+        match = re.search(pattern, content, re.DOTALL)
+        if match:
+            result[tag] = match.group(1).strip()
+        else:
+            result[tag] = ""
+
+    return result
+
+
 @_tracer.start_as_current_span("compress_session")
 async def _compress_session(session: Session) -> None:
     span = trace.get_current_span()
     _logger.info(f"压缩会话: {session.data.session_id} 总token: {session.data.total_token}")
-    old_system_prompt = session.data.system_prompt
-    session.set_system_prompt(COMPRESS_SYSTEM)
     session.add_user_message(COMPRESS_USER_CALL_MESSAGE)
-    result = await get_gate().call_model(session.data.messages)
-    compressed_content = result.choices[0].message.content
-    if compressed_content:
-        session.clear_message()
-        session.add_user_message(compressed_content)
-        session.set_system_prompt(old_system_prompt)
-        if result.usage:
-            session.data.total_token = result.usage.completion_tokens
-            span.add_event(
-                "context_compressed",
-                {
-                    "gen_ai.token.original": result.usage.prompt_tokens,
-                    "gen_ai.token.compressed": result.usage.completion_tokens,
-                    "gen_ai.session_id": session.data.session_id,
-                },
+
+    # 最多重试 3 次
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        if attempt > max_retries:
+            span.set_status(StatusCode.ERROR, "压缩会话失败：返回内容为空")
+            raise SystemException("压缩会话失败：返回内容为空")
+        try:
+            result = await get_gate().call_model(session.data.messages)
+            compressed_content = result.choices[0].message.content
+
+            if not compressed_content:
+                _logger.error(f"会话压缩 {session.data.session_id} 失败: 返回内容为空")
+                _logger.warning(f"第 {attempt} 次压缩失败，准备重试...")
+                continue
+
+            # 提取 XML 标签内容
+            extracted_data = _extract_xml_tags(compressed_content)
+
+            # 检查是否成功提取到所有标签
+            missing_tags = [tag for tag, content in extracted_data.items() if not content]
+            if missing_tags:
+                _logger.warning(f"第 {attempt} 次压缩：缺少标签 {missing_tags}")
+
+            # 保存用户偏好和项目情况到文件
+            save_compressed_data(
+                extracted_data["user_preferences"],
+                extracted_data["project_context"],
             )
-        _logger.info(f"会话 {session.data.session_id} 压缩完成")
-    else:
-        _logger.error(f"会话压缩 {session.data.session_id} 失败")
-        raise ValueError("压缩会话失败")
+
+            # 更新会话
+            session.clear_message()
+            session.add_user_message(compressed_content)
+
+            if result.usage:
+                session.data.total_token = result.usage.completion_tokens
+                span.add_event(
+                    "context_compressed",
+                    {
+                        "gen_ai.token.original": result.usage.prompt_tokens,
+                        "gen_ai.token.compressed": result.usage.completion_tokens,
+                        "gen_ai.session_id": session.data.session_id,
+                    },
+                )
+
+            _logger.info(f"会话 {session.data.session_id} 压缩完成")
+            break
+
+        except Exception as e:
+            _logger.error(f"第 {attempt} 次压缩异常: {e}", exc_info=True)
+            if attempt == max_retries:
+                span.set_status(StatusCode.ERROR, f"压缩会话失败: {e}")
+                raise SystemException(f"压缩会话失败: {e}") from None
 
 
 def _get_tool_summary(tool_calls: list[ChatCompletionMessageToolCallUnion]) -> str:

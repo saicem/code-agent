@@ -77,7 +77,7 @@ def get_tool(tool_name: str) -> ToolInfo | None:
 
 
 @cache
-def tools_for_gen_ai(tag: str) -> Iterable[ChatCompletionToolUnionParam]:
+def tools_for_gen_ai(tag: ToolTag) -> Iterable[ChatCompletionToolUnionParam]:
     """获取所有注册的工具信息
 
     Returns:

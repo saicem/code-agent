@@ -1,4 +1,3 @@
-import contextvars
 import json
 import os
 from dataclasses import asdict
@@ -7,7 +6,6 @@ from typing import Any
 from code_agent.agent.memory import load_memory
 from code_agent.agent.prompt import CODE_SYSTEM
 from code_agent.agent.session import Session
-from code_agent.core.config import get_config
 from code_agent.monitoring import get_logger
 
 _logger = get_logger(__name__)
@@ -176,11 +174,3 @@ class SessionManager:
         # 按更新时间排序
         sessions.sort(key=lambda x: x["updated_at"], reverse=True)
         return sessions
-
-
-current_session = contextvars.ContextVar[Session]("current_session")
-_session_manager = SessionManager(get_config().storage.sessions_dir)
-
-
-def get_session_manager() -> SessionManager:
-    return _session_manager

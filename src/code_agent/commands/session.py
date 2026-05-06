@@ -1,4 +1,8 @@
-from code_agent.agent.session_manager import SessionManager, current_session, get_session_manager
+from dependency_injector.wiring import Provide
+
+from code_agent.agent.session_manager import SessionManager
+from code_agent.core.container import Container
+from code_agent.core.state import current_session
 from code_agent.utils import print_system_output
 
 
@@ -11,7 +15,9 @@ def _show_session_help() -> None:
     print_system_output("  /session info      - 显示当前会话信息", "info")
 
 
-def _handle_session_list(session_manager: SessionManager) -> None:
+def _handle_session_list(
+    session_manager: SessionManager = Provide[Container.session_manager],
+) -> None:
     sessions = session_manager.get_session_list()
     if not sessions:
         print_system_output("\n没有找到任何会话", "info")
@@ -29,7 +35,9 @@ def _handle_session_list(session_manager: SessionManager) -> None:
         print_system_output(f"       消息: {session['message_count']} 条", "info")
 
 
-def _handle_session_switch(session_manager: SessionManager, session_id: str) -> None:
+def _handle_session_switch(
+    session_id: str, session_manager: SessionManager = Provide[Container.session_manager]
+) -> None:
     session = session_manager.load_session(session_id)
     if session:
         current_session.set(session)
@@ -38,13 +46,18 @@ def _handle_session_switch(session_manager: SessionManager, session_id: str) -> 
         print_system_output(f"\n错误: 无法找到会话 {session_id}", "error")
 
 
-def _handle_session_new(session_manager: SessionManager) -> None:
+def _handle_session_new(
+    session_manager: SessionManager = Provide[Container.session_manager],
+) -> None:
     session = session_manager.create_session()
     current_session.set(session)
     print_system_output(f"\n已创建新会话: {session.data.session_id}", "info")
 
 
-def _handle_session_delete(session_manager: SessionManager, session_id: str) -> None:
+def _handle_session_delete(
+    session_id: str,
+    session_manager: SessionManager = Provide[Container.session_manager],
+) -> None:
     if session_manager.delete_session(session_id):
         print_system_output(f"\n已删除会话: {session_id}", "info")
         if current_session.get().data.session_id == session_id:
@@ -55,7 +68,7 @@ def _handle_session_delete(session_manager: SessionManager, session_id: str) -> 
         print_system_output(f"\n错误: 无法找到会话 {session_id}", "error")
 
 
-def _handle_session_info(session_manager: SessionManager) -> None:
+def _handle_session_info() -> None:
     session = current_session.get()
     print_system_output("\n当前会话信息:", "info")
     print_system_output(f"  会话ID: {session.data.session_id}", "info")
@@ -66,11 +79,6 @@ def _handle_session_info(session_manager: SessionManager) -> None:
 
 
 def _handle_session(command: str) -> None:
-    session_manager = get_session_manager()
-    if not session_manager:
-        print_system_output("\n错误: 会话管理器未初始化", "error")
-        return
-
     cmd_parts = command.split(" ", 2)
     if len(cmd_parts) < 2:
         _show_session_help()
@@ -79,23 +87,23 @@ def _handle_session(command: str) -> None:
     sub_cmd = cmd_parts[1].lower()
 
     if sub_cmd == "list":
-        _handle_session_list(session_manager)
+        _handle_session_list()
     elif sub_cmd == "switch":
         if len(cmd_parts) < 3:
             print_system_output("\n用法: /session switch <会话ID>", "info")
             return
         session_id = cmd_parts[2].strip()
-        _handle_session_switch(session_manager, session_id)
+        _handle_session_switch(session_id)
     elif sub_cmd == "new":
-        _handle_session_new(session_manager)
+        _handle_session_new()
     elif sub_cmd == "delete":
         if len(cmd_parts) < 3:
             print_system_output("\n用法: /session delete <会话ID>", "info")
             return
         session_id = cmd_parts[2].strip()
-        _handle_session_delete(session_manager, session_id)
+        _handle_session_delete(session_id)
     elif sub_cmd == "info":
-        _handle_session_info(session_manager)
+        _handle_session_info()
     else:
         _show_session_help()
 

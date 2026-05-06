@@ -5,18 +5,20 @@
 
 import re
 
+from dependency_injector.wiring import Provide, inject
 from openai.types.chat import ChatCompletionMessageToolCallUnion
 from opentelemetry import trace
 from opentelemetry.trace.status import StatusCode
 
 from code_agent import monitoring
-from code_agent.agent.gate import get_gate
+from code_agent.agent.gate import GenAiGate
 from code_agent.agent.memory import save_compressed_data
 from code_agent.agent.prompt import (
     COMPRESS_USER_CALL_MESSAGE,
 )
 from code_agent.agent.session import Session
 from code_agent.core.config import get_config
+from code_agent.core.container import Container
 from code_agent.core.exceptions import SystemException
 from code_agent.tools import (
     handle_tool_calls,
@@ -38,7 +40,10 @@ async def reasoning_acting(session: Session, tag: str) -> None:
         raise
 
 
-async def _reasoning_acting(session: Session, tag: str) -> None:
+@inject
+async def _reasoning_acting(
+    session: Session, tag: str, gate: GenAiGate = Provide[Container.gate]
+) -> None:
     span = trace.get_current_span()
     span.set_attribute("gen_ai.tool.tag", tag)
     span.set_attribute("gen_ai.session_id", session.data.session_id)
@@ -51,7 +56,7 @@ async def _reasoning_acting(session: Session, tag: str) -> None:
         _logger.debug(f"第 {cycle_count + 1} 次循环")
         if session.data.total_token >= _engine_config.max_token:
             await _compress_session(session)
-        response = await get_gate().call_model(session.data.messages, tools_for_gen_ai(tag))
+        response = await gate.call_model(session.data.messages, tools_for_gen_ai(tag))
         message = response.choices[0].message
 
         # 处理助手消息
@@ -108,7 +113,10 @@ def _extract_xml_tags(content: str) -> dict[str, str]:
 
 
 @_tracer.start_as_current_span("compress_session")
-async def _compress_session(session: Session) -> None:
+async def _compress_session(
+    session: Session,
+    gate: GenAiGate = Provide[Container.gate],
+) -> None:
     span = trace.get_current_span()
     _logger.info(f"压缩会话: {session.data.session_id} 总token: {session.data.total_token}")
     session.add_user_message(COMPRESS_USER_CALL_MESSAGE)
@@ -120,7 +128,7 @@ async def _compress_session(session: Session) -> None:
             span.set_status(StatusCode.ERROR, "压缩会话失败：返回内容为空")
             raise SystemException("压缩会话失败：返回内容为空")
         try:
-            result = await get_gate().call_model(session.data.messages)
+            result = await gate.call_model(session.data.messages)
             compressed_content = result.choices[0].message.content
 
             if not compressed_content:

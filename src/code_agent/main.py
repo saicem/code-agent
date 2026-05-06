@@ -5,10 +5,14 @@ Code Agent 主入口文件
 
 import asyncio
 
+from dependency_injector.wiring import Provide, inject
+
 import code_agent._setup  # noqa: F401
 from code_agent.agent.engine import reasoning_acting
-from code_agent.agent.session_manager import current_session, get_session_manager
+from code_agent.agent.session_manager import SessionManager
 from code_agent.commands import handle_command
+from code_agent.core.container import Container
+from code_agent.core.state import current_session
 from code_agent.monitoring import get_logger, get_tracer
 from code_agent.utils import get_user_input, print_system_output
 
@@ -16,9 +20,9 @@ _logger = get_logger(__name__)
 _tracer = get_tracer(__name__)
 
 
-async def main():
+@inject
+async def main(session_manager: SessionManager = Provide[Container.session_manager]):
     _logger.info("========== Code Agent 启动中 ==========")
-    session_manager = get_session_manager()
 
     session = session_manager.load_last_session()
     if not session:
@@ -42,6 +46,7 @@ async def main():
         session = current_session.get()
         session.add_user_message(task)
         try:
+            # 从依赖容器获取推理引擎
             await reasoning_acting(session, "code")
         except Exception as e:
             _logger.error(f"任务执行失败: {e}", exc_info=True)
@@ -52,4 +57,7 @@ async def main():
 
 
 if __name__ == "__main__":
+    container = Container()
+    # Wire 所有相关的子包和模块
+    container.wire(modules=[__name__], packages=["code_agent"])
     asyncio.run(main())

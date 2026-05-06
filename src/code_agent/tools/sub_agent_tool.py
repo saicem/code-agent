@@ -6,13 +6,16 @@
 
 import json
 
+from dependency_injector.wiring import Provide, inject
 from pydantic import BaseModel, Field
 
 from code_agent import monitoring
 from code_agent.agent.prompt import CODE_SYSTEM
 from code_agent.agent.session import Session
-from code_agent.agent.session_manager import current_session, get_session_manager
+from code_agent.agent.session_manager import SessionManager
+from code_agent.core.container import Container
 from code_agent.core.exceptions import ToolException
+from code_agent.core.state import current_session
 from code_agent.tools._manager import tool
 from code_agent.utils import print_tool_output
 from code_agent.utils.tool_util import build_tool_response
@@ -33,7 +36,10 @@ class SubAgentTaskParams(BaseModel):
     param_type=SubAgentTaskParams,
     tags=["plan"],
 )
-async def run_sub_agent_task(params: str) -> str:
+@inject
+async def run_sub_agent_task(
+    params: str, session_manager: SessionManager = Provide[Container.session_manager]
+) -> str:
     # 延迟导入，避免循环依赖
     from code_agent.agent.engine import reasoning_acting
 
@@ -61,7 +67,7 @@ async def run_sub_agent_task(params: str) -> str:
         current_session.reset(token)
 
     # 保存子会话
-    get_session_manager().save_session(sub_session)
+    session_manager.save_session(sub_session)
 
     if not sub_session.data.messages:
         _logger.error("子Agent没有返回任何消息")

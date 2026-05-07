@@ -51,3 +51,4 @@ dist/
 .git
 .ruff_cache/
 logs/
+todo*.md

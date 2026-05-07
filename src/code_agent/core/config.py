@@ -6,6 +6,7 @@
 
 from os import makedirs
 from os.path import abspath, join
+from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,25 +26,33 @@ class StorageConfig(BaseModel):
     base_dir: str = Field(default=".", description="基础目录")
     storage_dir: str = Field(default="", description="存储目录")
     sessions_dir: str = Field(default="", description="会话目录")
+    auto_memory: str = Field(default="", description="自动记忆文件路径")
+    file_update: str = Field(default="", description="文件更新记录文件路径")
 
+    @model_validator(mode="after")
+    def _post_init(self) -> Self:
+        """初始化后处理：填充依赖路径并确保目录存在"""
+        if not self.storage_dir:
+            self.storage_dir = abspath(join(self.base_dir, ".memo"))
 
-class ContextConfig(BaseModel):
-    """上下文相关配置"""
+        if not self.sessions_dir:
+            self.sessions_dir = join(self.storage_dir, "sessions")
 
-    max_dialogues: int = Field(default=10, description="会话上下文最大对话数量")
-    context_file: str = Field(default="", description="会话上下文文件路径")
+        if not self.auto_memory:
+            self.auto_memory = join(self.storage_dir, "auto_memory.md")
+
+        if not self.file_update:
+            self.file_update = join(self.storage_dir, "file_update.md")
+
+        makedirs(self.storage_dir, exist_ok=True)
+        makedirs(self.sessions_dir, exist_ok=True)
+        return self
 
 
 class SecurityConfig(BaseModel):
     """安全相关配置"""
 
     check_enabled: bool = Field(default=True, description="是否启用安全检查")
-
-
-class LoggingConfig(BaseModel):
-    """日志相关配置"""
-
-    otlp_enabled: bool = Field(default=False, description="是否启用 OTLP 导出器")
 
 
 class EngineConfig(BaseModel):
@@ -66,36 +75,8 @@ class Config(BaseSettings):
     # 分组配置
     gate: GateConfig = Field(default_factory=GateConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
-    context: ContextConfig = Field(default_factory=ContextConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
-    logging: LoggingConfig = Field(default_factory=LoggingConfig)
     engine: EngineConfig = Field(default_factory=EngineConfig)
-
-    @model_validator(mode="after")
-    def _post_init(self) -> "Config":
-        """初始化后处理：填充依赖路径并确保目录存在"""
-        self._fill_dependent_paths()
-        self._ensure_directories()
-        return self
-
-    def _fill_dependent_paths(self):
-        """填充依赖于其他配置项的路径"""
-        # 存储目录
-        if not self.storage.storage_dir:
-            self.storage.storage_dir = abspath(join(self.storage.base_dir, ".memo"))
-
-        # 会话目录
-        if not self.storage.sessions_dir:
-            self.storage.sessions_dir = join(self.storage.storage_dir, "sessions")
-
-        # 上下文文件
-        if not self.context.context_file:
-            self.context.context_file = join(self.storage.storage_dir, "session_context.json")
-
-    def _ensure_directories(self):
-        """确保必要的目录存在"""
-        makedirs(self.storage.storage_dir, exist_ok=True)
-        makedirs(self.storage.sessions_dir, exist_ok=True)
 
 
 _config = Config()

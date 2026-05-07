@@ -5,8 +5,7 @@
 支持文件变更检测和文档更新
 
 **核心要求**：所有文档必须写入文件，确保持久化存储
-- 用户偏好：.memo/preference.md
-- 项目总览：.memo/project.md
+- 记忆文件：.memo/auto_memory.md
 """
 
 import json
@@ -14,15 +13,17 @@ import os
 from datetime import datetime
 from typing import List, Tuple
 
+from dependency_injector.wiring import Provide, inject
 from pydantic import BaseModel
 
-from code_agent.core.config import get_config
+from code_agent.core.config import Config
+from code_agent.core.container import Container
 from code_agent.monitoring import get_logger, get_tracer
 from code_agent.utils import print_system_output
 from code_agent.utils.path_spec import DEFAULT_IGNORE_SPEC, get_pathspec_from_gitignore
 
-_tracer = get_tracer(__name__)
-_logger = get_logger(__name__)
+_tracer = get_tracer(__file__)
+_logger = get_logger(__file__)
 
 
 class FileUpdateData(BaseModel):
@@ -32,82 +33,47 @@ class FileUpdateData(BaseModel):
     last_check: str = datetime.now().isoformat()  # 上次检查时间（ISO格式）
 
 
-# 全局配置
-_config = get_config()
-_MEMO_DIR = _config.storage.storage_dir
-_PROJECT_FILE = os.path.join(_MEMO_DIR, "project.md")
-_PREFERENCE_FILE = os.path.join(_MEMO_DIR, "preference.md")
-_FILE_UPDATE_FILE = os.path.join(_MEMO_DIR, "file_update.json")
 _file_ignore_spec = get_pathspec_from_gitignore(".gitignore") or DEFAULT_IGNORE_SPEC
-os.makedirs(os.path.join(_MEMO_DIR, "ref"), exist_ok=True)
 
 
-def save_compressed_data(user_preferences: str, project_context: str) -> None:
-    """将用户偏好和项目情况持久化到文件
+@inject
+def save_compressed_data(auto_memory: str, config: Config = Provide[Container.config]) -> None:
+    """将用户偏好和项目情况持久化到文件"""
 
-    Args:
-        user_preferences: 用户偏好内容
-        project_context: 项目情况内容
-    """
-
-    # 保存用户偏好
-    if user_preferences:
+    if auto_memory:
         try:
-            with open(_PREFERENCE_FILE, "w", encoding="utf-8") as f:
-                f.write(user_preferences)
-            _logger.debug(f"用户偏好已保存到: {_PREFERENCE_FILE}")
+            with open(config.storage.auto_memory, "w", encoding="utf-8") as f:
+                f.write(auto_memory)
+            _logger.debug(f"记忆已保存到: {config.storage.auto_memory}")
         except Exception as e:
-            _logger.error(f"保存用户偏好失败: {e}", exc_info=True)
-
-    # 保存项目情况
-    if project_context:
-        try:
-            with open(_PROJECT_FILE, "w", encoding="utf-8") as f:
-                f.write(project_context)
-            _logger.debug(f"项目情况已保存到: {_PROJECT_FILE}")
-        except Exception as e:
-            _logger.error(f"保存项目情况失败: {e}", exc_info=True)
+            _logger.error(f"保存记忆失败: {e}", exc_info=True)
 
 
 @_tracer.start_as_current_span("load_memory")
-def load_memory() -> str:
+@inject
+def load_memory(config: Config = Provide[Container.config]) -> str:
     """加载记忆文件，读取 project.md 和 preference.md 并以 XML 标签包含"""
     _logger.info("开始加载记忆文件")
     print_system_output("正在加载记忆文件...", "info")
 
-    # 读取 preference.md
-    preference_content = ""
-    if os.path.exists(_PREFERENCE_FILE):
+    # 读取记忆文件
+    auto_memory_content = ""
+    if os.path.exists(config.storage.auto_memory):
         try:
-            with open(_PREFERENCE_FILE, "r", encoding="utf-8") as f:
-                preference_content = f.read()
-            _logger.debug(f"成功读取 preference.md，内容长度: {len(preference_content)}")
+            with open(config.storage.auto_memory, "r", encoding="utf-8") as f:
+                auto_memory_content = f.read()
+            _logger.debug(f"成功读取记忆文件，内容长度: {len(auto_memory_content)}")
         except Exception as e:
             _logger.error(f"读取 preference.md 失败: {e}")
             print_system_output(f"读取 preference.md 失败: {e}", "error")
     else:
-        _logger.debug("preference.md 不存在")
-
-    # 读取 project.md
-    project_content = ""
-    if os.path.exists(_PROJECT_FILE):
-        try:
-            with open(_PROJECT_FILE, "r", encoding="utf-8") as f:
-                project_content = f.read()
-            _logger.debug(f"成功读取 project.md，内容长度: {len(project_content)}")
-        except Exception as e:
-            _logger.error(f"读取 project.md 失败: {e}")
-            print_system_output(f"读取 project.md 失败: {e}", "error")
-    else:
-        _logger.debug("project.md 不存在")
+        _logger.debug("记忆文件 不存在")
 
     memory = f"""
-<user_preferences>
-{preference_content}
-</user_preferences>
-<project_context>
-{project_content}
-</project_context>
+<auto_memory>
+{auto_memory_content}
+</auto_memory>
+
 """
 
     _logger.info(f"记忆文件加载完成，总长度: {len(memory)}")
@@ -117,12 +83,13 @@ def load_memory() -> str:
     return memory
 
 
-def _load_file_updates() -> FileUpdateData | None:
+@inject
+def _load_file_updates(config: Config = Provide[Container.config]) -> FileUpdateData | None:
     """加载文件更新记录"""
-    _logger.debug(f"尝试加载文件更新记录: {_FILE_UPDATE_FILE}")
-    if os.path.exists(_FILE_UPDATE_FILE):
+    _logger.debug(f"尝试加载文件更新记录: {config.storage.file_update}")
+    if os.path.exists(config.storage.file_update):
         try:
-            with open(_FILE_UPDATE_FILE, "r", encoding="utf-8") as f:
+            with open(config.storage.file_update, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 result = FileUpdateData(**data)
                 _logger.debug(f"成功加载文件更新记录，包含 {len(result.files)} 个文件")
@@ -135,11 +102,14 @@ def _load_file_updates() -> FileUpdateData | None:
     return None
 
 
-def _save_file_updates(file_updates: FileUpdateData) -> None:
+@inject
+def _save_file_updates(
+    file_updates: FileUpdateData, config: Config = Provide[Container.config]
+) -> None:
     """保存文件更新记录"""
     file_updates.last_check = datetime.now().isoformat()
     try:
-        with open(_FILE_UPDATE_FILE, "w", encoding="utf-8") as f:
+        with open(config.storage.file_update, "w", encoding="utf-8") as f:
             json.dump(file_updates.model_dump(), f, indent=2, ensure_ascii=False)
         _logger.debug(f"成功保存文件更新记录，包含 {len(file_updates.files)} 个文件")
     except Exception as e:

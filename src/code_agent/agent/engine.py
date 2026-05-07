@@ -147,8 +147,7 @@ async def _compress_session(
 
             # 保存用户偏好和项目情况到文件
             save_compressed_data(
-                extracted_data["user_preferences"],
-                extracted_data["project_context"],
+                extracted_data["auto_memory"],
             )
 
             # 更新会话

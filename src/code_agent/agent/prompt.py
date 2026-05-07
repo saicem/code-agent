@@ -38,10 +38,10 @@ SUB_AGENT_SYSTEM = """你是任务执行助手，负责完成具体子任务。�
 
 COMPRESS_SYSTEM = """你是会话压缩助手，将会话内容压缩为简明摘要。"""
 
-COMPRESS_USER_CALL_MESSAGE = """请客观压缩上述对话内容，分为三部分并用 XML 标签包裹：
+COMPRESS_USER_CALL_MESSAGE = """请客观压缩上述对话内容，分为两部分并用 XML 标签包裹：
 ## 压缩规则
 
-### 1. 用户偏好
+### 1. 用户偏好和项目情况
 提取用户的编程习惯、技术偏好和要求：
 - 注释风格（详细/简洁）
 - 代码检查工具（ty、ruff 等）
@@ -49,13 +49,12 @@ COMPRESS_USER_CALL_MESSAGE = """请客观压缩上述对话内容，分为三部
 - 技术框架偏好
 - 其他特定要求
 
-### 2. 项目情况
 记录项目的基本信息：
 - 技术栈和核心依赖
 - 项目架构和模块结构
 - 已完成的分析和文档
 
-### 3. 当前任务
+### 2. 当前任务
 总结当前任务的关键信息：
 - 任务目标是什么
 - 执行过程的关键步骤
@@ -66,12 +65,9 @@ COMPRESS_USER_CALL_MESSAGE = """请客观压缩上述对话内容，分为三部
 ## 输出格式
 ```xml
 <compressed>
-<user_preferences>
-用户偏好内容
-</user_preferences>
-<project_context>
-项目情况内容
-</project_context>
+<auto_memory>
+项目情况以及用户偏好内容
+</auto_memory>
 <current_task>
 当前任务内容
 </current_task>

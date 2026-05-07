@@ -2,6 +2,7 @@
 """
 思考引擎模块
 """
+from code_agent.agent.gate import GenAiGate
 
 import re
 
@@ -11,24 +12,19 @@ from opentelemetry import trace
 from opentelemetry.trace.status import StatusCode
 
 from code_agent import monitoring
-from code_agent.agent.gate import GenAiGate
-from code_agent.agent.memory import save_compressed_data
+from code_agent.agent.memory import MemoryManager
 from code_agent.agent.prompt import (
     COMPRESS_USER_CALL_MESSAGE,
 )
 from code_agent.agent.session import Session
-from code_agent.core.config import get_config
+from code_agent.core.config import Config
 from code_agent.core.container import Container
 from code_agent.core.exceptions import SystemException
-from code_agent.tools import (
-    handle_tool_calls,
-    tools_for_gen_ai,
-)
+from code_agent.tools import handle_tool_calls, tools_for_gen_ai
 from code_agent.utils import print_model_output, print_system_output
 
 _tracer = monitoring.get_tracer(__name__)
 _logger = monitoring.get_logger(__name__)
-_engine_config = get_config().engine
 
 
 @_tracer.start_as_current_span("reasoning_acting")
@@ -42,19 +38,23 @@ async def reasoning_acting(session: Session, tag: str) -> None:
 
 @inject
 async def _reasoning_acting(
-    session: Session, tag: str, gate: GenAiGate = Provide[Container.gate]
+    session: Session,
+    tag: str,
+    gate: GenAiGate = Provide[Container.gate],
+    config: Config = Provide[Container.config],
 ) -> None:
     span = trace.get_current_span()
     span.set_attribute("gen_ai.tool.tag", tag)
     span.set_attribute("gen_ai.session_id", session.data.session_id)
     if session.data.parent_session_id is not None:
         span.set_attribute("gen_ai.parent_session_id", session.data.parent_session_id)
-    _logger.info(f"开始 ReAct 循环，最大循环次数: {_engine_config.max_cycles}，工具标签: {tag}")
+    engine_config = config.engine
+    _logger.info(f"开始 ReAct 循环，最大循环次数: {engine_config.max_cycles}，工具标签: {tag}")
     cycle_count = 0
-    while cycle_count < _engine_config.max_cycles:
+    while cycle_count < engine_config.max_cycles:
         cycle_count += 1
         _logger.debug(f"第 {cycle_count + 1} 次循环")
-        if session.data.total_token >= _engine_config.max_token:
+        if session.data.total_token >= engine_config.max_token:
             await _compress_session(session)
         response = await gate.call_model(session.data.messages, tools_for_gen_ai(tag))
         message = response.choices[0].message
@@ -77,8 +77,8 @@ async def _reasoning_acting(
             tool_call_result = await handle_tool_calls(message.tool_calls)
             session.add_tool_messages(tool_call_result)
 
-        if cycle_count >= _engine_config.max_cycles:
-            _logger.warning(f"达到最大循环次数 {_engine_config.max_cycles}")
+        if cycle_count >= engine_config.max_cycles:
+            _logger.warning(f"达到最大循环次数 {engine_config.max_cycles}")
             return
 
 
@@ -116,6 +116,7 @@ def _extract_xml_tags(content: str) -> dict[str, str]:
 async def _compress_session(
     session: Session,
     gate: GenAiGate = Provide[Container.gate],
+    memory_service: MemoryManager = Provide[Container.memory_manager],
 ) -> None:
     print_system_output("压缩会话中...")
     span = trace.get_current_span()
@@ -146,7 +147,7 @@ async def _compress_session(
                 _logger.warning(f"第 {attempt} 次压缩：缺少标签 {missing_tags}")
 
             # 保存用户偏好和项目情况到文件
-            save_compressed_data(
+            memory_service.save_compressed_data(
                 extracted_data["auto_memory"],
             )
 

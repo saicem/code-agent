@@ -5,7 +5,6 @@ Code Agent 主入口文件
 
 import asyncio
 
-import code_agent._setup  # noqa: F401
 from code_agent.agent.app import start_agent
 from code_agent.core.container import Container
 

@@ -39,19 +39,19 @@ class SessionManager:
         session = Session()
         memory = self._memory_manager.load_memory() if self._memory_manager else ""
         session.set_system_prompt(CODE_SYSTEM + memory)
-        _logger.info(f"创建新会话: {session.data.session_id}")
+        _logger.info(f"创建新会话: {session.session_id}")
         self.save_session(session)
         return session
 
     def save_session(self, session: Session):
         """保存会话"""
-        session_id = session.data.session_id
+        session_id = session.session_id
         _logger.debug(f"保存会话: {session_id}")
         session_file = os.path.join(self.sessions_dir, f"{session_id}.json")
 
         try:
             with open(session_file, "w", encoding="utf-8") as f:
-                json.dump(asdict(session.data), f, ensure_ascii=False, indent=2)
+                json.dump(asdict(session), f, ensure_ascii=False, indent=2)
 
             with open(self.last_session_file, "w", encoding="utf-8") as f:
                 json.dump({"last_session_id": session_id}, f)

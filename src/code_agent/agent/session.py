@@ -20,11 +20,7 @@ _logger = logging.getLogger(__name__)
 
 
 @dataclass
-class SessionData:
-    """会话数据模型
-    用于会话的序列化和反序列化
-    """
-
+class Session:
     session_id: str = field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
     parent_session_id: str | None = None
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -34,15 +30,6 @@ class SessionData:
     messages: list[ChatCompletionMessageParam] = field(default_factory=list)
     history: list[ChatCompletionMessageParam] = field(default_factory=list)
 
-
-class Session:
-    """会话类
-    负责管理单个会话的消息，支持 OpenAI 格式的消息结构
-    """
-
-    def __init__(self, data: SessionData | None = None):
-        self.data = SessionData() if data is None else data
-
     def set_system_prompt(self, content: str):
         """设置系统提示词"""
         self.system_prompt = content
@@ -50,8 +37,8 @@ class Session:
     def add_user_message(self, content: str):
         """添加用户消息"""
         message: ChatCompletionUserMessageParam = {"role": "user", "content": content}
-        self.data.messages.append(message)
-        self.data.history.append(message)
+        self.messages.append(message)
+        self.history.append(message)
         self.updated_at = datetime.now().isoformat()
 
     def add_tool_message(self, content: str, tool_call_id: str):
@@ -61,14 +48,14 @@ class Session:
             "content": content,
             "tool_call_id": tool_call_id,
         }
-        self.data.messages.append(message)
-        self.data.history.append(message)
+        self.messages.append(message)
+        self.history.append(message)
         self.updated_at = datetime.now().isoformat()
 
     def add_tool_messages(self, tool_messages: list[ChatCompletionToolMessageParam]):
         """添加工具输出消息"""
-        self.data.messages.extend(tool_messages)
-        self.data.history.extend(tool_messages)
+        self.messages.extend(tool_messages)
+        self.history.extend(tool_messages)
         self.updated_at = datetime.now().isoformat()
 
     def add_assistant_message(
@@ -82,8 +69,8 @@ class Session:
         }
         if tool_calls:
             message["tool_calls"] = tool_calls
-        self.data.messages.append(message)
-        self.data.history.append(message)
+        self.messages.append(message)
+        self.history.append(message)
         self.updated_at = datetime.now().isoformat()
 
     def messages_for_model(self) -> list[ChatCompletionMessageParam]:
@@ -100,14 +87,14 @@ class Session:
 
         # 查找最新的 assistant 输出
         last_assistant_index = -1
-        for i in range(len(self.data.messages) - 1, -1, -1):
-            msg = self.data.messages[i]
+        for i in range(len(self.messages) - 1, -1, -1):
+            msg = self.messages[i]
             if msg.get("role") == "assistant":
                 last_assistant_index = i
                 break
 
         # 导出消息，删除最新 assistant 之前的 tool 输出
-        for i, msg in enumerate(self.data.messages):
+        for i, msg in enumerate(self.messages):
             # 如果这是最新的 assistant 之前的 tool 消息，跳过
             if i < last_assistant_index and msg.get("role") == "tool":
                 continue
@@ -119,10 +106,10 @@ class Session:
     @classmethod
     def from_dict(cls, **kwargs) -> "Session":
         """从字典反序列化"""
-        return cls(SessionData(**kwargs))
+        return cls(**kwargs)
 
     def clear_message(self) -> None:
-        self.data.messages = []
+        self.messages = []
 
     def _clean_message(self) -> None:
-        self.data.messages = [msg for msg in self.data.messages if msg.get("role") != "tool"]
+        self.messages = [msg for msg in self.messages if msg.get("role") != "tool"]

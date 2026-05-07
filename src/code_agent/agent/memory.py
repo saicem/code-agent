@@ -23,7 +23,7 @@ from code_agent.utils.path_spec import DEFAULT_IGNORE_SPEC, get_pathspec_from_gi
 if TYPE_CHECKING:
     pass
 
-_logger = logging.getLogger(__file__)
+_logger = logging.getLogger(__name__)
 
 
 class FileUpdateData(BaseModel):
@@ -37,7 +37,7 @@ class MemoryManager:
     """记忆管理服务"""
 
     def __init__(self, config: Config) -> None:
-        self.file_update = config.storage.auto_memory
+        self.file_update = config.storage.file_update
         self.auto_memory = config.storage.auto_memory
         self._file_ignore_spec = get_pathspec_from_gitignore(".gitignore") or DEFAULT_IGNORE_SPEC
 

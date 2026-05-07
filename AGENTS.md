@@ -12,4 +12,4 @@
 - 每次代码变更后执行检查 `ty check` `ruff format` `ruff check --fix`
 - 模块化设计：当单个文件内容过多功能过于复杂时，尝试将其重构划分为多个模块
 - 命名遵循 PEP 8：所有代码都必须符合 PEP 8 规范，包括变量名、函数名、类名等
-- 需要记录 log 和 trace。通过 get_logger() 和 get_tracer() 获取日志记录器和跟踪器
+- 需要记录 log 和 trace

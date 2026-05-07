@@ -24,7 +24,7 @@ def _handle_session_list(
         return
 
     print_system_output("\n会话列表:", "info")
-    current_id = current_session.get().data.session_id
+    current_id = current_session.get().session_id
     for i, session in enumerate(sessions, 1):
         marker = "*" if session["id"] == current_id else " "
         created = session.get("created_at", "")[:19].replace("T", " ")
@@ -51,7 +51,7 @@ def _handle_session_new(
 ) -> None:
     session = session_manager.create_session()
     current_session.set(session)
-    print_system_output(f"\n已创建新会话: {session.data.session_id}", "info")
+    print_system_output(f"\n已创建新会话: {session.session_id}", "info")
 
 
 def _handle_session_delete(
@@ -60,10 +60,10 @@ def _handle_session_delete(
 ) -> None:
     if session_manager.delete_session(session_id):
         print_system_output(f"\n已删除会话: {session_id}", "info")
-        if current_session.get().data.session_id == session_id:
+        if current_session.get().session_id == session_id:
             session = session_manager.create_session()
             current_session.set(session)
-            print_system_output(f"已创建新会话: {session.data.session_id}", "info")
+            print_system_output(f"已创建新会话: {session.session_id}", "info")
     else:
         print_system_output(f"\n错误: 无法找到会话 {session_id}", "error")
 
@@ -71,11 +71,11 @@ def _handle_session_delete(
 def _handle_session_info() -> None:
     session = current_session.get()
     print_system_output("\n当前会话信息:", "info")
-    print_system_output(f"  会话ID: {session.data.session_id}", "info")
-    print_system_output(f"  创建时间: {session.data.created_at[:19].replace('T', ' ')}", "info")
-    print_system_output(f"  更新时间: {session.data.updated_at[:19].replace('T', ' ')}", "info")
-    print_system_output(f"  消息数量: {len(session.data.messages)}", "info")
-    print_system_output(f"  预估总Token数: {session.data.total_token}", "info")
+    print_system_output(f"  会话ID: {session.session_id}", "info")
+    print_system_output(f"  创建时间: {session.created_at[:19].replace('T', ' ')}", "info")
+    print_system_output(f"  更新时间: {session.updated_at[:19].replace('T', ' ')}", "info")
+    print_system_output(f"  消息数量: {len(session.messages)}", "info")
+    print_system_output(f"  预估总Token数: {session.total_token}", "info")
 
 
 def _handle_session(command: str) -> None:

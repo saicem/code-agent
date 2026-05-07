@@ -14,7 +14,7 @@ from code_agent.agent.prompt import CODE_SYSTEM
 from code_agent.agent.session import Session
 from code_agent.agent.session_manager import SessionManager
 from code_agent.core.container import Container
-from code_agent.core.exceptions import ToolException
+from code_agent.core.exceptions import ToolError
 from code_agent.core.state import current_session
 from code_agent.tools._manager import tool
 from code_agent.utils import print_tool_output
@@ -55,7 +55,7 @@ async def run_sub_agent_task(
     sub_session = Session()
     sub_session.set_system_prompt(CODE_SYSTEM)
     sub_session.add_user_message(validated_params.task)
-    sub_session.data.parent_session_id = current_session.get().data.session_id
+    sub_session.parent_session_id = current_session.get().session_id
 
     # 保存当前会话并设置子会话
     token = current_session.set(sub_session)
@@ -68,21 +68,21 @@ async def run_sub_agent_task(
     # 保存子会话
     session_manager.save_session(sub_session)
 
-    if not sub_session.data.messages:
+    if not sub_session.messages:
         _logger.error("子Agent没有返回任何消息")
-        raise ToolException("子Agent没有返回任何消息")
+        raise ToolError("子Agent没有返回任何消息")
 
-    last_message = sub_session.data.messages[-1]
+    last_message = sub_session.messages[-1]
     if isinstance(last_message, dict) and last_message.get("role") == "assistant":
         summary = last_message.get("content", "")
     else:
         _logger.error(f"子Agent返回的不是文本消息 {last_message}")
-        raise ToolException("子Agent返回的不是文本消息")
+        raise ToolError("子Agent返回的不是文本消息")
     return build_tool_response(
         True,
         "子任务执行成功",
         {
             "summary": summary,
-            "total_messages": len(sub_session.data.messages),
+            "total_messages": len(sub_session.messages),
         },
     )

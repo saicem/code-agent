@@ -45,18 +45,18 @@ async def _reasoning_acting(
 ) -> None:
     span = trace.get_current_span()
     span.set_attribute("gen_ai.tool.tag", tag)
-    span.set_attribute("gen_ai.session_id", session.data.session_id)
-    if session.data.parent_session_id is not None:
-        span.set_attribute("gen_ai.parent_session_id", session.data.parent_session_id)
+    span.set_attribute("gen_ai.session_id", session.session_id)
+    if session.parent_session_id is not None:
+        span.set_attribute("gen_ai.parent_session_id", session.parent_session_id)
     engine_config = config.engine
     _logger.info(f"开始 ReAct 循环，最大循环次数: {engine_config.max_cycles}，工具标签: {tag}")
     cycle_count = 0
     while cycle_count < engine_config.max_cycles:
         cycle_count += 1
         _logger.debug(f"第 {cycle_count + 1} 次循环")
-        if session.data.total_token >= engine_config.max_token:
+        if session.total_token >= engine_config.max_token:
             await _compress_session(session)
-        response = await gate.call_model(session.data.messages, tools_for_gen_ai(tag))
+        response = await gate.call_model(session.messages, tools_for_gen_ai(tag))
         message = response.choices[0].message
 
         # 处理助手消息
@@ -67,7 +67,7 @@ async def _reasoning_acting(
             print_model_output(message.content + tool_call_summary)
 
         if response.usage:
-            session.data.total_token = response.usage.total_tokens
+            session.total_token = response.usage.total_tokens
 
         # 处理工具调用
         if message.tool_calls is None:
@@ -120,7 +120,7 @@ async def _compress_session(
 ) -> None:
     print_system_output("压缩会话中...")
     span = trace.get_current_span()
-    _logger.info(f"压缩会话: {session.data.session_id} 总token: {session.data.total_token}")
+    _logger.info(f"压缩会话: {session.session_id} 总token: {session.total_token}")
     session.add_user_message(COMPRESS_USER_CALL_MESSAGE)
 
     # 最多重试 3 次
@@ -130,11 +130,11 @@ async def _compress_session(
             span.set_status(StatusCode.ERROR, "压缩会话失败：返回内容为空")
             raise SystemException("压缩会话失败：返回内容为空")
         try:
-            result = await gate.call_model(session.data.messages)
+            result = await gate.call_model(session.messages)
             compressed_content = result.choices[0].message.content
 
             if not compressed_content:
-                _logger.error(f"会话压缩 {session.data.session_id} 失败: 返回内容为空")
+                _logger.error(f"会话压缩 {session.session_id} 失败: 返回内容为空")
                 _logger.warning(f"第 {attempt} 次压缩失败，准备重试...")
                 continue
 
@@ -156,17 +156,17 @@ async def _compress_session(
             session.add_user_message(compressed_content)
 
             if result.usage:
-                session.data.total_token = result.usage.completion_tokens
+                session.total_token = result.usage.completion_tokens
                 span.add_event(
                     "context_compressed",
                     {
                         "gen_ai.token.original": result.usage.prompt_tokens,
                         "gen_ai.token.compressed": result.usage.completion_tokens,
-                        "gen_ai.session_id": session.data.session_id,
+                        "gen_ai.session_id": session.session_id,
                     },
                 )
 
-            _logger.info(f"会话 {session.data.session_id} 压缩完成")
+            _logger.info(f"会话 {session.session_id} 压缩完成")
             print_system_output("压缩会话完成")
             break
 

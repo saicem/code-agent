@@ -10,7 +10,7 @@ from typing import Any, Type
 
 from pydantic import BaseModel, ValidationError
 
-from code_agent.core.exceptions import ToolException
+from code_agent.core.exceptions import ToolError
 
 
 def validate_params[T: BaseModel](params: str, param_type: Type[T]) -> T:
@@ -31,9 +31,9 @@ def validate_params[T: BaseModel](params: str, param_type: Type[T]) -> T:
         validated_params = param_type.model_validate_json(params)
         return validated_params
     except ValidationError as e:
-        raise ToolException(f"参数验证失败: {e!s}") from e
+        raise ToolError(f"参数验证失败: {e!s}") from e
     except json.JSONDecodeError as e:
-        raise ToolException(f"JSON 解析失败: {e!s}") from e
+        raise ToolError(f"JSON 解析失败: {e!s}") from e
 
 
 def build_full_path(file_path: str, base_dir: str | None = None) -> str:
@@ -58,7 +58,7 @@ def build_full_path(file_path: str, base_dir: str | None = None) -> str:
 
     # 确保路径在基础目录内
     if not full_path.startswith(base_dir):
-        raise ToolException("文件路径超出允许范围")
+        raise ToolError("文件路径超出允许范围")
 
     return full_path
 

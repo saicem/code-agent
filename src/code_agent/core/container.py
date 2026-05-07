@@ -26,11 +26,11 @@ class Container(containers.DeclarativeContainer):
 
     session_manager: providers.Singleton[SessionManager] = providers.Singleton(
         SessionManager,
-        sessions_dir=config().storage.sessions_dir,
+        sessions_dir=providers.Callable(lambda c: c.storage.sessions_dir, config),
         memory_manager=memory_manager,
     )
 
     gate: providers.Factory[GenAiGate] = providers.Factory(
         GenAiGate,
-        config=config().gate,
+        config=providers.Callable(lambda c: c.gate, config),
     )

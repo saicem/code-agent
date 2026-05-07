@@ -8,10 +8,7 @@ from ddgs import DDGS
 from pydantic import BaseModel, Field
 
 from code_agent.tools._manager import tool
-from code_agent.utils.tool_util import (
-    build_tool_response,
-    validate_params,
-)
+from code_agent.utils.tool_util import build_tool_response
 
 
 class SearchParams(BaseModel):
@@ -27,24 +24,20 @@ class SearchParams(BaseModel):
     param_type=SearchParams,
     tags=["code", "plan"],
 )
-async def search_web(params: str) -> str:
+async def search_web(params: SearchParams) -> str:
     """搜索网络内容
 
     Args:
-        params: JSON 格式的参数字符串
+        params: 参数对象
 
     Returns:
         JSON 格式的结果字符串
     """
-    # 使用统一工具函数校验参数
-    validated_params = validate_params(params, SearchParams)
-
-    # 使用 DuckDuckGo 搜索
     with DDGS() as ddgs:
         results = []
         for result in ddgs.text(
-            validated_params.query,
-            max_results=validated_params.limit,
+            params.query,
+            max_results=params.limit,
         ):
             results.append(
                 {
@@ -59,6 +52,6 @@ async def search_web(params: str) -> str:
         "搜索完成",
         data={
             "results": results,
-            "query": validated_params.query,
+            "query": params.query,
         },
     )

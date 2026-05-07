@@ -9,11 +9,7 @@ import os
 from pydantic import BaseModel, Field
 
 from code_agent.tools._manager import tool
-from code_agent.utils.tool_util import (
-    build_full_path,
-    build_tool_response,
-    validate_params,
-)
+from code_agent.utils.tool_util import build_full_path, build_tool_response
 
 
 class BashParams(BaseModel):
@@ -29,25 +25,22 @@ class BashParams(BaseModel):
     param_type=BashParams,
     tags=["code"],
 )
-async def run_bash(params: str) -> str:
+async def run_bash(params: BashParams) -> str:
     """执行终端命令
 
     Args:
-        params: JSON 格式的参数字符串
+        params: 参数对象
 
     Returns:
         JSON 格式的结果字符串
     """
-    # 使用统一工具函数校验参数
-    validated_params = validate_params(params, BashParams)
-    full_cwd = build_full_path(validated_params.cwd or ".")
+    full_cwd = build_full_path(params.cwd or ".")
 
-    # 检查目录是否存在
     if not os.path.exists(full_cwd):
         return build_tool_response(False, f"工作目录不存在: {full_cwd}")
 
     process = await asyncio.create_subprocess_shell(
-        validated_params.command,
+        params.command,
         cwd=full_cwd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -55,7 +48,6 @@ async def run_bash(params: str) -> str:
 
     stdout_bytes, stderr_bytes = await asyncio.wait_for(process.communicate(), timeout=30)
 
-    # 尝试解码输出，支持多种编码
     def decode_output(bytes_data: bytes) -> str:
         encodings = ["utf-8", "gbk", "cp1252", "latin-1"]
         for encoding in encodings:
@@ -63,7 +55,6 @@ async def run_bash(params: str) -> str:
                 return bytes_data.decode(encoding)
             except UnicodeDecodeError:
                 continue
-        # 最后使用 ignore 策略处理无法解码的字节
         return bytes_data.decode("utf-8", errors="replace")
 
     stdout = decode_output(stdout_bytes)

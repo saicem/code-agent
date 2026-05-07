@@ -9,11 +9,7 @@ import os
 from pydantic import BaseModel, Field
 
 from code_agent.tools._manager import tool
-from code_agent.utils.tool_util import (
-    build_full_path,
-    build_tool_response,
-    validate_params,
-)
+from code_agent.utils.tool_util import build_full_path, build_tool_response
 
 
 class EditParams(BaseModel):
@@ -30,36 +26,35 @@ class EditParams(BaseModel):
     param_type=EditParams,
     tags=["code"],
 )
-def edit_file(params: str) -> str:
+def edit_file(params: EditParams) -> str:
     """编辑文件
 
     Args:
-        params: JSON 格式的参数字符串
+        params: 参数对象
 
     Returns:
         JSON 格式的结果字符串
     """
-    validated_params = validate_params(params, EditParams)
-    full_path = build_full_path(validated_params.file_path)
+    full_path = build_full_path(params.file_path)
 
     if not os.path.exists(full_path):
         return build_tool_response(
             False,
-            f"文件不存在: {validated_params.file_path}",
+            f"文件不存在: {params.file_path}",
         )
 
     with open(full_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    if validated_params.old_string not in content:
+    if params.old_string not in content:
         return build_tool_response(
             False,
             "文件中未找到要替换的内容",
         )
 
     new_content = content.replace(
-        validated_params.old_string,
-        validated_params.new_string,
+        params.old_string,
+        params.new_string,
     )
 
     with open(full_path, "w", encoding="utf-8") as f:

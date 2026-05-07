@@ -34,3 +34,5 @@ doc/
 .idea/
 *.sublime-project
 *.sublime-workspace
+
+logs/

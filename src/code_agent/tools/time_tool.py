@@ -9,10 +9,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from code_agent.tools._manager import tool
-from code_agent.utils.tool_util import (
-    build_tool_response,
-    validate_params,
-)
+from code_agent.utils.tool_util import build_tool_response
 
 
 class TimeParams(BaseModel):
@@ -27,19 +24,15 @@ class TimeParams(BaseModel):
     param_type=TimeParams,
     tags=["code", "plan"],
 )
-async def get_current_time(params: str) -> str:
+async def get_current_time(params: TimeParams) -> str:
     """获取当前时间
 
     Args:
-        params: JSON 格式的参数字符串
+        params: 参数对象
 
     Returns:
         JSON 格式的结果字符串
     """
-    # 使用统一工具函数校验参数（虽然不需要参数）
-    validate_params(params, TimeParams)
-
-    # 获取当前时间（ISO 8601 格式）
     current_time = datetime.now().isoformat()
 
     return build_tool_response(

@@ -49,4 +49,5 @@ dist/
 .tmp/
 
 .git
-.ruff_cache
+.ruff_cache/
+logs/

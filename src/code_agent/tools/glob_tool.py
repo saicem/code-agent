@@ -10,10 +10,7 @@ import os
 from pydantic import BaseModel, Field
 
 from code_agent.tools._manager import tool
-from code_agent.utils.tool_util import (
-    build_tool_response,
-    validate_params,
-)
+from code_agent.utils.tool_util import build_tool_response
 
 
 class GlobParams(BaseModel):
@@ -35,19 +32,16 @@ def _do_search(pattern: str) -> list[str]:
     param_type=GlobParams,
     tags=["code"],
 )
-async def search_files(params: str) -> str:
+async def search_files(params: GlobParams) -> str:
     """搜索文件
 
     Args:
-        params: JSON 格式的参数字符串
+        params: 参数对象
 
     Returns:
         JSON 格式的结果字符串
     """
-    # 使用统一工具函数校验参数
-    validated_params = validate_params(params, GlobParams)
-    # 异步执行搜索
-    files = await asyncio.to_thread(_do_search, validated_params.pattern)
+    files = await asyncio.to_thread(_do_search, params.pattern)
 
     return build_tool_response(
         True,

@@ -5,16 +5,13 @@ HTTP 请求工具
 区别于网络搜索工具，此工具可直接请求指定的 API 或网页
 """
 
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from pydantic import BaseModel, Field
 
 from code_agent.tools._manager import tool
-from code_agent.utils.tool_util import (
-    build_tool_response,
-    validate_params,
-)
+from code_agent.utils.tool_util import build_tool_response
 
 
 class HttpRequestParams(BaseModel):
@@ -22,10 +19,10 @@ class HttpRequestParams(BaseModel):
 
     url: str = Field(..., description="请求的目标 URL")
     method: str = Field("GET", description="HTTP 方法，支持 GET、POST、PUT、DELETE，默认为 GET")
-    headers: Optional[dict[str, str]] = Field(None, description="请求头字典，可选")
-    params: Optional[dict[str, str]] = Field(None, description="URL 查询参数，可选")
-    data: Optional[dict[str, Any]] = Field(None, description="POST 请求体数据，可选")
-    json_data: Optional[dict[str, Any]] = Field(None, description="JSON 请求体，可选")
+    headers: dict[str, str] | None = Field(None, description="请求头字典，可选")
+    params: dict[str, str] | None = Field(None, description="URL 查询参数，可选")
+    data: dict[str, Any] | None = Field(None, description="POST 请求体数据，可选")
+    json_data: dict[str, Any] | None = Field(None, description="JSON 请求体，可选")
     timeout: int = Field(30, description="请求超时时间（秒），默认为 30")
     allow_redirects: bool = Field(True, description="是否允许重定向，默认为 True")
 
@@ -36,44 +33,38 @@ class HttpRequestParams(BaseModel):
     param_type=HttpRequestParams,
     tags=["code", "plan"],
 )
-async def http_request(params: str) -> str:
+async def http_request(params: HttpRequestParams) -> str:
     """发送 HTTP 请求
 
     Args:
-        params: JSON 格式的参数字符串
+        params: 参数对象
 
     Returns:
         JSON 格式的结果字符串
     """
-    # 使用统一工具函数校验参数
-    validated_params = validate_params(params, HttpRequestParams)
-
     async with httpx.AsyncClient(
-        timeout=httpx.Timeout(validated_params.timeout),
-        follow_redirects=validated_params.allow_redirects,
+        timeout=httpx.Timeout(params.timeout),
+        follow_redirects=params.allow_redirects,
     ) as client:
-        method = validated_params.method.upper()
+        method = params.method.upper()
 
-        # 构建请求参数
         request_kwargs: dict[str, Any] = {
-            "url": validated_params.url,
+            "url": params.url,
         }
 
-        if validated_params.headers:
-            request_kwargs["headers"] = validated_params.headers
+        if params.headers:
+            request_kwargs["headers"] = params.headers
 
-        if validated_params.params:
-            request_kwargs["params"] = validated_params.params
+        if params.params:
+            request_kwargs["params"] = params.params
 
-        if validated_params.json_data:
-            request_kwargs["json"] = validated_params.json_data
-        elif validated_params.data:
-            request_kwargs["data"] = validated_params.data
+        if params.json_data:
+            request_kwargs["json"] = params.json_data
+        elif params.data:
+            request_kwargs["data"] = params.data
 
-        # 根据方法发送请求
         response = await client.request(method, **request_kwargs)
 
-        # 获取响应内容
         try:
             response_data = response.json()
         except ValueError:
@@ -83,7 +74,7 @@ async def http_request(params: str) -> str:
             True,
             f"请求成功，状态码: {response.status_code}",
             data={
-                "url": validated_params.url,
+                "url": params.url,
                 "method": method,
                 "status_code": response.status_code,
                 "headers": dict(response.headers),

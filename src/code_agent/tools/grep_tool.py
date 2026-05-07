@@ -10,11 +10,7 @@ import re
 from pydantic import BaseModel, Field
 
 from code_agent.tools._manager import tool
-from code_agent.utils.tool_util import (
-    build_full_path,
-    build_tool_response,
-    validate_params,
-)
+from code_agent.utils.tool_util import build_full_path, build_tool_response
 
 
 class GrepParams(BaseModel):
@@ -71,32 +67,28 @@ def _do_search(full_path: str, pattern: str, file_pattern: str) -> list[dict]:
     param_type=GrepParams,
     tags=["code"],
 )
-async def search_content(params: str) -> str:
+async def search_content(params: GrepParams) -> str:
     """搜索内容
 
     Args:
-        params: JSON 格式的参数字符串
+        params: 参数对象
 
     Returns:
         JSON 格式的结果字符串
     """
-    # 使用统一工具函数校验参数
-    validated_params = validate_params(params, GrepParams)
-    full_path = build_full_path(validated_params.path or ".")
+    full_path = build_full_path(params.path or ".")
 
-    # 检查目录是否存在
     if not os.path.exists(full_path):
         return build_tool_response(
             False,
             f"搜索路径不存在: {full_path}",
         )
 
-    # 异步执行搜索
     results = await asyncio.to_thread(
         _do_search,
         full_path,
-        validated_params.pattern,
-        validated_params.file_pattern,
+        params.pattern,
+        params.file_pattern,
     )
 
     return build_tool_response(

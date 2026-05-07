@@ -9,11 +9,7 @@ import os
 from pydantic import BaseModel, Field
 
 from code_agent.tools._manager import tool
-from code_agent.utils.tool_util import (
-    build_full_path,
-    build_tool_response,
-    validate_params,
-)
+from code_agent.utils.tool_util import build_full_path, build_tool_response
 
 
 class WriteParams(BaseModel):
@@ -30,35 +26,31 @@ class WriteParams(BaseModel):
     param_type=WriteParams,
     tags=["code"],
 )
-def write_file(params: str) -> str:
+def write_file(params: WriteParams) -> str:
     """写入文件
 
     Args:
-        params: JSON 格式的参数字符串
+        params: 参数对象
 
     Returns:
         JSON 格式的结果字符串
     """
-    # 使用统一工具函数校验参数
-    validated_params = validate_params(params, WriteParams)
-    full_path = build_full_path(validated_params.file_path)
+    full_path = build_full_path(params.file_path)
 
-    # 确保目录存在
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
 
-    # 检查文件是否存在
-    if os.path.exists(full_path) and not validated_params.overwrite:
+    if os.path.exists(full_path) and not params.overwrite:
         return build_tool_response(
             False,
             "文件已存在，且 overwrite 为 False",
-            data={"file_path": validated_params.file_path},
+            data={"file_path": params.file_path},
         )
 
     with open(full_path, "w", encoding="utf-8") as f:
-        f.write(validated_params.content)
+        f.write(params.content)
 
     return build_tool_response(
         True,
-        f"文件写入成功: {validated_params.file_path}",
-        data={"file_path": validated_params.file_path},
+        f"文件写入成功: {params.file_path}",
+        data={"file_path": params.file_path},
     )

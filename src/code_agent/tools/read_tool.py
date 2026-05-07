@@ -9,11 +9,7 @@ import os
 from pydantic import BaseModel, Field
 
 from code_agent.tools._manager import tool
-from code_agent.utils.tool_util import (
-    build_full_path,
-    build_tool_response,
-    validate_params,
-)
+from code_agent.utils.tool_util import build_full_path, build_tool_response
 
 
 class ReadParams(BaseModel):
@@ -28,28 +24,27 @@ class ReadParams(BaseModel):
     param_type=ReadParams,
     tags=["code"],
 )
-def read_file(params: str) -> str:
+def read_file(params: ReadParams) -> str:
     """读取文件
 
     Args:
-        params: JSON 格式的参数字符串
+        params: 参数对象
 
     Returns:
         JSON 格式的结果字符串
     """
-    validated_params = validate_params(params, ReadParams)
-    full_path = build_full_path(validated_params.file_path)
+    full_path = build_full_path(params.file_path)
 
     if not os.path.exists(full_path):
         return build_tool_response(
             False,
-            f"文件不存在: {validated_params.file_path}",
+            f"文件不存在: {params.file_path}",
         )
 
     if not os.path.isfile(full_path):
         return build_tool_response(
             False,
-            f"路径不是文件: {validated_params.file_path}",
+            f"路径不是文件: {params.file_path}",
         )
 
     with open(full_path, "r", encoding="utf-8") as f:
@@ -60,6 +55,6 @@ def read_file(params: str) -> str:
         "读取成功",
         data={
             "content": content,
-            "file_path": validated_params.file_path,
+            "file_path": params.file_path,
         },
     )

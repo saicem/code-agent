@@ -111,5 +111,3 @@ class Session:
     def clear_message(self) -> None:
         self.messages = []
 
-    def _clean_message(self) -> None:
-        self.messages = [msg for msg in self.messages if msg.get("role") != "tool"]

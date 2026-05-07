@@ -21,7 +21,6 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENTRYPOINT []
 
 ENV PYTHONPATH=/app/src
-ENV TELEMETRY_ENABLED=true
-ENV TELEMETRY_OTLP_ENDPOINT=http://tempo:4318/v1/traces
+ENV OTEL__ENABLED=true
 
 CMD ["uv", "run", "python", "src/code_agent/main.py"]

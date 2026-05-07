@@ -82,13 +82,6 @@ async def _reasoning_acting(
             return
 
 
-@tracer.start_as_current_span("plan_and_execute")
-async def plan_and_execute(
-    session: Session,
-) -> None:
-    await reasoning_acting(session, "plan")
-
-
 def _extract_xml_tags(content: str) -> dict[str, str]:
     """从内容中提取 XML 标签内容
 
@@ -127,8 +120,8 @@ async def _compress_session(
     max_retries = 3
     for attempt in range(1, max_retries + 1):
         if attempt > max_retries:
-            span.set_status(StatusCode.ERROR, "压缩会话失败：返回内容为空")
-            raise SystemError("压缩会话失败：返回内容为空")
+            span.set_status(StatusCode.ERROR, "压缩会话失败：超过最大重试次数")
+            raise SystemError("压缩会话失败：超过最大重试次数")
         try:
             result = await gate.call_model(session.messages)
             compressed_content = result.choices[0].message.content
@@ -144,7 +137,9 @@ async def _compress_session(
             # 检查是否成功提取到所有标签
             missing_tags = [tag for tag, content in extracted_data.items() if not content]
             if missing_tags:
-                _logger.warning(f"第 {attempt} 次压缩：缺少标签 {missing_tags}")
+                _logger.warning(
+                    f"第 {attempt} 次压缩：缺少标签 {missing_tags}, 内容: {compressed_content}"
+                )
 
             # 保存用户偏好和项目情况到文件
             memory_manager.save_compressed_data(

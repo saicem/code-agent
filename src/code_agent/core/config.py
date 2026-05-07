@@ -27,7 +27,6 @@ class StorageConfig(BaseModel):
     storage_dir: str = Field(default="", description="存储目录")
     sessions_dir: str = Field(default="", description="会话目录")
     auto_memory: str = Field(default="", description="自动记忆文件路径")
-    file_update: str = Field(default="", description="文件更新记录文件路径")
 
     @model_validator(mode="after")
     def _post_init(self) -> Self:
@@ -41,18 +40,9 @@ class StorageConfig(BaseModel):
         if not self.auto_memory:
             self.auto_memory = join(self.storage_dir, "auto_memory.md")
 
-        if not self.file_update:
-            self.file_update = join(self.storage_dir, "file_update.md")
-
         makedirs(self.storage_dir, exist_ok=True)
         makedirs(self.sessions_dir, exist_ok=True)
         return self
-
-
-class SecurityConfig(BaseModel):
-    """安全相关配置"""
-
-    check_enabled: bool = Field(default=True, description="是否启用安全检查")
 
 
 class EngineConfig(BaseModel):
@@ -75,5 +65,4 @@ class Config(BaseSettings):
     # 分组配置
     gate: GateConfig = Field(default_factory=GateConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
-    security: SecurityConfig = Field(default_factory=SecurityConfig)
     engine: EngineConfig = Field(default_factory=EngineConfig)

@@ -109,26 +109,4 @@ COMPRESS_USER_CALL_MESSAGE = """请客观压缩上述对话内容，分为两部
 - 保持信息准确性和完整性
 - 只输出 XML 格式的压缩内容，无其他额外文字"""
 
-MEMORY_CONTEXT_SYSTEM = """你是专业的项目分析助手。
 
-## 角色定义
-- 分析项目技术栈、模块结构和配置依赖
-- 将分析结果写入 Markdown 文档
-
-## 约束规则
-- 文档存储位置：`.memo/project.md`
-- 排除依赖目录（`node_modules/`、`venv/`、`__pycache__/`、`.git/`）
-- 使用简洁的 Markdown 格式"""
-
-
-MEMORY_ANALYZE_TASK = """请分析项目并更新文档：
-
-## 分析内容
-1. **技术栈**：编程语言、核心框架、依赖库
-2. **模块概述**：项目目录结构和各模块职责
-3. **配置依赖**：`pyproject.toml`、`requirements.txt`、`package.json` 等配置文件内容
-
-## 输出要求
-- 将分析结果写入 `.memo/project.md`
-- 格式简洁清晰，突出重点
-- 完成后输出："文档更新完成"及更新内容摘要"""

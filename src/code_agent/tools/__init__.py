@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import logging
 
 from openai.types.chat import (
     ChatCompletionMessageFunctionToolCall,
@@ -15,7 +16,7 @@ from opentelemetry import trace
 from opentelemetry.semconv._incubating.attributes import gen_ai_attributes
 from opentelemetry.trace.status import StatusCode
 
-from code_agent.monitoring import get_logger, get_tracer
+from code_agent.core.state import tracer
 from code_agent.tools import (
     bash_tool,
     edit_tool,
@@ -46,11 +47,10 @@ __all__ = [
 ]
 
 
-_tracer = get_tracer(__name__)
-_logger = get_logger(__name__)
+_logger = logging.getLogger(__name__)
 
 
-@_tracer.start_as_current_span("handle_tool_calls")
+@tracer.start_as_current_span("handle_tool_calls")
 async def handle_tool_calls(
     tool_calls: list[ChatCompletionMessageToolCallUnion],
 ) -> list[ChatCompletionToolMessageParam]:
@@ -67,7 +67,7 @@ async def handle_tool_calls(
     return result
 
 
-@_tracer.start_as_current_span("handle_function_tool_call")
+@tracer.start_as_current_span("handle_function_tool_call")
 async def handle_function_tool_call(
     tool_call: ChatCompletionMessageFunctionToolCall,
 ) -> ChatCompletionToolMessageParam:

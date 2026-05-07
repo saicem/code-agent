@@ -1,3 +1,4 @@
+import logging
 from typing import Iterable
 
 from openai import AsyncOpenAI, Omit, omit
@@ -7,11 +8,9 @@ from openai.types.chat import (
     ChatCompletionToolUnionParam,
 )
 
-from code_agent import monitoring
 from code_agent.core.config import GateConfig
 
-_tracer = monitoring.get_tracer(__name__)
-_logger = monitoring.get_logger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class GenAiGate:

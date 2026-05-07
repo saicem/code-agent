@@ -2,8 +2,8 @@
 """
 思考引擎模块
 """
-from code_agent.agent.gate import GenAiGate
 
+import logging
 import re
 
 from dependency_injector.wiring import Provide, inject
@@ -11,23 +11,23 @@ from openai.types.chat import ChatCompletionMessageToolCallUnion
 from opentelemetry import trace
 from opentelemetry.trace.status import StatusCode
 
-from code_agent import monitoring
+from code_agent.agent.gate import GenAiGate
 from code_agent.agent.memory import MemoryManager
 from code_agent.agent.prompt import (
     COMPRESS_USER_CALL_MESSAGE,
 )
 from code_agent.agent.session import Session
+from code_agent.commands import tracer
 from code_agent.core.config import Config
 from code_agent.core.container import Container
 from code_agent.core.exceptions import SystemException
 from code_agent.tools import handle_tool_calls, tools_for_gen_ai
 from code_agent.utils import print_model_output, print_system_output
 
-_tracer = monitoring.get_tracer(__name__)
-_logger = monitoring.get_logger(__name__)
+_logger = logging.getLogger(__name__)
 
 
-@_tracer.start_as_current_span("reasoning_acting")
+@tracer.start_as_current_span("reasoning_acting")
 async def reasoning_acting(session: Session, tag: str) -> None:
     try:
         await _reasoning_acting(session, tag)
@@ -82,7 +82,7 @@ async def _reasoning_acting(
             return
 
 
-@_tracer.start_as_current_span("plan_and_execute")
+@tracer.start_as_current_span("plan_and_execute")
 async def plan_and_execute(
     session: Session,
 ) -> None:
@@ -112,11 +112,11 @@ def _extract_xml_tags(content: str) -> dict[str, str]:
     return result
 
 
-@_tracer.start_as_current_span("compress_session")
+@tracer.start_as_current_span("compress_session")
 async def _compress_session(
     session: Session,
     gate: GenAiGate = Provide[Container.gate],
-    memory_service: MemoryManager = Provide[Container.memory_manager],
+    memory_manager: MemoryManager = Provide[Container.memory_manager],
 ) -> None:
     print_system_output("压缩会话中...")
     span = trace.get_current_span()
@@ -147,7 +147,7 @@ async def _compress_session(
                 _logger.warning(f"第 {attempt} 次压缩：缺少标签 {missing_tags}")
 
             # 保存用户偏好和项目情况到文件
-            memory_service.save_compressed_data(
+            memory_manager.save_compressed_data(
                 extracted_data["auto_memory"],
             )
 

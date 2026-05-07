@@ -9,6 +9,7 @@
 """
 
 import json
+import logging
 import os
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -16,15 +17,13 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 from code_agent.core.config import Config
-from code_agent.monitoring import get_logger, get_tracer
 from code_agent.utils import print_system_output
 from code_agent.utils.path_spec import DEFAULT_IGNORE_SPEC, get_pathspec_from_gitignore
 
 if TYPE_CHECKING:
     pass
 
-_tracer = get_tracer(__file__)
-_logger = get_logger(__file__)
+_logger = logging.getLogger(__file__)
 
 
 class FileUpdateData(BaseModel):
@@ -38,16 +37,17 @@ class MemoryManager:
     """记忆管理服务"""
 
     def __init__(self, config: Config) -> None:
-        self._config = config
+        self.file_update = config.storage.auto_memory
+        self.auto_memory = config.storage.auto_memory
         self._file_ignore_spec = get_pathspec_from_gitignore(".gitignore") or DEFAULT_IGNORE_SPEC
 
     def save_compressed_data(self, auto_memory: str) -> None:
         """将用户偏好和项目情况持久化到文件"""
         if auto_memory:
             try:
-                with open(self._config.storage.auto_memory, "w", encoding="utf-8") as f:
+                with open(self.auto_memory, "w", encoding="utf-8") as f:
                     f.write(auto_memory)
-                _logger.debug(f"记忆已保存到: {self._config.storage.auto_memory}")
+                _logger.debug(f"记忆已保存到: {self.auto_memory}")
             except Exception as e:
                 _logger.error(f"保存记忆失败: {e}", exc_info=True)
 
@@ -57,9 +57,9 @@ class MemoryManager:
         print_system_output("正在加载记忆文件...", "info")
 
         auto_memory_content = ""
-        if os.path.exists(self._config.storage.auto_memory):
+        if os.path.exists(self.auto_memory):
             try:
-                with open(self._config.storage.auto_memory, "r", encoding="utf-8") as f:
+                with open(self.auto_memory, "r", encoding="utf-8") as f:
                     auto_memory_content = f.read()
                 _logger.debug(f"成功读取记忆文件，内容长度: {len(auto_memory_content)}")
             except Exception as e:
@@ -82,10 +82,10 @@ class MemoryManager:
 
     def _load_file_updates(self) -> FileUpdateData | None:
         """加载文件更新记录"""
-        _logger.debug(f"尝试加载文件更新记录: {self._config.storage.file_update}")
-        if os.path.exists(self._config.storage.file_update):
+        _logger.debug(f"尝试加载文件更新记录: {self.file_update}")
+        if os.path.exists(self.file_update):
             try:
-                with open(self._config.storage.file_update, "r", encoding="utf-8") as f:
+                with open(self.file_update, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     result = FileUpdateData(**data)
                     _logger.debug(f"成功加载文件更新记录，包含 {len(result.files)} 个文件")
@@ -101,7 +101,7 @@ class MemoryManager:
         """保存文件更新记录"""
         file_updates.last_check = datetime.now().isoformat()
         try:
-            with open(self._config.storage.file_update, "w", encoding="utf-8") as f:
+            with open(self.file_update, "w", encoding="utf-8") as f:
                 json.dump(file_updates.model_dump(), f, indent=2, ensure_ascii=False)
             _logger.debug(f"成功保存文件更新记录，包含 {len(file_updates.files)} 个文件")
         except Exception as e:

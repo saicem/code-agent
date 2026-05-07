@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from functools import cache
 from typing import Callable, Iterable, Literal
@@ -15,10 +16,9 @@ from openai.types.chat import (
 )
 from pydantic import BaseModel, TypeAdapter
 
-from code_agent import monitoring
 from code_agent.core.exceptions import SystemException
 
-_logger = monitoring.get_logger(__name__)
+_logger = logging.getLogger(__name__)
 
 type ToolTag = Literal["code", "plan"]
 

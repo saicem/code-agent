@@ -4,6 +4,7 @@
 包含 Session 类和 SessionManager 类
 """
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -15,10 +16,7 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 
-from code_agent.monitoring import get_logger, get_tracer
-
-_logger = get_logger(__name__)
-_tracer = get_tracer(__name__)
+_logger = logging.getLogger(__name__)
 
 
 @dataclass

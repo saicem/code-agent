@@ -1,3 +1,5 @@
+import logging
+
 from dependency_injector.wiring import Provide, inject
 
 from code_agent.agent.engine import reasoning_acting
@@ -5,11 +7,9 @@ from code_agent.agent.session_manager import SessionManager
 from code_agent.commands import handle_command
 from code_agent.core.container import Container
 from code_agent.core.state import current_session
-from code_agent.monitoring import get_logger, get_tracer
 from code_agent.utils import get_user_input, print_system_output
 
-_logger = get_logger(__name__)
-_tracer = get_tracer(__name__)
+_logger = logging.getLogger(__name__)
 
 
 @inject

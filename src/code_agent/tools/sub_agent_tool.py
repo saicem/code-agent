@@ -5,11 +5,11 @@
 """
 
 import json
+import logging
 
 from dependency_injector.wiring import Provide, inject
 from pydantic import BaseModel, Field
 
-from code_agent import monitoring
 from code_agent.agent.prompt import CODE_SYSTEM
 from code_agent.agent.session import Session
 from code_agent.agent.session_manager import SessionManager
@@ -20,8 +20,7 @@ from code_agent.tools._manager import tool
 from code_agent.utils import print_tool_output
 from code_agent.utils.tool_util import build_tool_response
 
-_tracer = monitoring.get_tracer(__name__)
-_logger = monitoring.get_logger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class SubAgentTaskParams(BaseModel):

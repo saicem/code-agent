@@ -1,11 +1,12 @@
+import logging
 from typing import Any, Callable
 
 from code_agent.commands.session import register_session_commands
 from code_agent.commands.system import register_system_commands
-from code_agent.monitoring import get_tracer
+from code_agent.core.state import tracer
 from code_agent.utils import print_system_output
 
-tracer = get_tracer(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class CommandHandler:

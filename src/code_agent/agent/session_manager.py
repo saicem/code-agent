@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from dataclasses import asdict
 from typing import Any
@@ -6,9 +7,8 @@ from typing import Any
 from code_agent.agent.memory import MemoryManager
 from code_agent.agent.prompt import CODE_SYSTEM
 from code_agent.agent.session import Session
-from code_agent.monitoring import get_logger
 
-_logger = get_logger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class SessionManager:
@@ -16,17 +16,17 @@ class SessionManager:
     管理会话的创建、保存、加载和切换
     """
 
-    def __init__(self, sessions_dir: str, memory_service: MemoryManager | None = None):
+    def __init__(self, sessions_dir: str, memory_manager: MemoryManager | None = None):
         """初始化会话管理器
 
         Args:
             sessions_dir: 会话存储文件夹路径
-            memory_service: 记忆服务（可选）
+            memory_manager: 记忆服务（可选）
         """
         _logger.debug(f"初始化会话管理器, 存储目录: {sessions_dir}")
         self.sessions_dir = sessions_dir
         self.last_session_file = os.path.join(sessions_dir, "last_session.json")
-        self._memory_service = memory_service
+        self._memory_manager = memory_manager
         os.makedirs(sessions_dir, exist_ok=True)
         _logger.info("会话管理器初始化完成")
 
@@ -37,7 +37,7 @@ class SessionManager:
             会话实例
         """
         session = Session()
-        memory = self._memory_service.load_memory() if self._memory_service else ""
+        memory = self._memory_manager.load_memory() if self._memory_manager else ""
         session.set_system_prompt(CODE_SYSTEM + memory)
         _logger.info(f"创建新会话: {session.data.session_id}")
         self.save_session(session)

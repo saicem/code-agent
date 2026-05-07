@@ -16,14 +16,8 @@ from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-resource: Resource | None = None
-_trace_provider: trace.TracerProvider | None = None
-_logger_provider: LoggerProvider | None = None
-_log_handler: LoggingHandler | None = None
-
 
 def init_otlp():
-    global resource, _trace_provider, _logger_provider, _log_handler
     """初始化 OTLP 导出器"""
     OpenAIInstrumentor().instrument()
     HTTPXClientInstrumentor().instrument()
@@ -31,35 +25,19 @@ def init_otlp():
     resource = Resource.create(attributes={SERVICE_NAME: "code-agent"})
 
     # 先初始化 trace provider（日志需要依赖它）
-    _trace_provider = TracerProvider(resource=resource)
-    _trace_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
-    trace.set_tracer_provider(_trace_provider)
+    trace_provider = TracerProvider(resource=resource)
+    trace_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    trace.set_tracer_provider(trace_provider)
 
     # 初始化 logger provider，确保与 trace 关联
-    _logger_provider = LoggerProvider(resource=resource)
-    _logger_provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter()))
-    _logs.set_logger_provider(_logger_provider)
+    logger_provider = LoggerProvider(resource=resource)
+    logger_provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter()))
+    _logs.set_logger_provider(logger_provider)
 
     # 配置标准 logging 模块的 handler
-    _log_handler = LoggingHandler(level=logging.NOTSET, logger_provider=_logger_provider)
-
-    root_logger = logging.getLogger()
-    root_logger.addHandler(_log_handler)
-    root_logger.setLevel(logging.DEBUG)
-    root_logger.info("OTLP 导出器初始化完成")
-
-
-def get_tracer(name: str, provider: trace.TracerProvider | None = None) -> trace.Tracer:
-    return trace.get_tracer(name, tracer_provider=provider)
-
-
-def get_logger(
-    name: str, level: int = logging.DEBUG, handler: logging.Handler | None = None
-) -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    if handler:
-        logger.addHandler(handler)
-    elif _log_handler:
-        logger.addHandler(_log_handler)
-    return logger
+    log_handler = LoggingHandler(level=logging.NOTSET, logger_provider=logger_provider)
+    logging.basicConfig(
+        level=logging.DEBUG,
+        handlers=[log_handler],
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )

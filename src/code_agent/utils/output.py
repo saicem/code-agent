@@ -5,12 +5,11 @@
 支持颜色输出和日志记录
 """
 
+import logging
 import sys
 
-from code_agent.monitoring import get_logger
-
 # 获取日志记录器
-_logger = get_logger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 class Color:

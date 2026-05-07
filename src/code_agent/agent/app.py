@@ -53,7 +53,11 @@ async def start_agent():
     # 循环对话
     while True:
         user_msg = must_get_user_input()
-        if user_msg.startswith("/"):
-            handle_command(user_msg)
-        else:
-            await handle_task(user_msg)
+        try:
+            if user_msg.startswith("/"):
+                handle_command(user_msg)
+            else:
+                await handle_task(user_msg)
+        except Exception as e:
+            _logger.error(f"处理用户输入时出错: {e}", exc_info=True)
+            print_system_output(f"执行错误: {e}", "error")

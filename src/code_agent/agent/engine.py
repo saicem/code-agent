@@ -20,7 +20,7 @@ from code_agent.agent.session import Session
 from code_agent.commands import tracer
 from code_agent.core.config import Config
 from code_agent.core.container import Container
-from code_agent.core.exceptions import SystemException
+from code_agent.core.exceptions import SystemError
 from code_agent.tools import handle_tool_calls, tools_for_gen_ai
 from code_agent.utils import print_model_output, print_system_output
 
@@ -98,7 +98,7 @@ def _extract_xml_tags(content: str) -> dict[str, str]:
     Returns:
         包含各标签内容的字典
     """
-    tags = ["user_preferences", "project_context", "current_task"]
+    tags = ["current_task", "auto_memory"]
     result: dict[str, str] = {}
 
     for tag in tags:
@@ -128,7 +128,7 @@ async def _compress_session(
     for attempt in range(1, max_retries + 1):
         if attempt > max_retries:
             span.set_status(StatusCode.ERROR, "压缩会话失败：返回内容为空")
-            raise SystemException("压缩会话失败：返回内容为空")
+            raise SystemError("压缩会话失败：返回内容为空")
         try:
             result = await gate.call_model(session.messages)
             compressed_content = result.choices[0].message.content
@@ -174,7 +174,7 @@ async def _compress_session(
             _logger.error(f"第 {attempt} 次压缩异常: {e}", exc_info=True)
             if attempt == max_retries:
                 span.set_status(StatusCode.ERROR, f"压缩会话失败: {e}")
-                raise SystemException(f"压缩会话失败: {e}") from None
+                raise SystemError(f"压缩会话失败: {e}") from None
 
 
 def _get_tool_summary(tool_calls: list[ChatCompletionMessageToolCallUnion]) -> str:

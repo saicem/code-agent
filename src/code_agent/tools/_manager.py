@@ -4,8 +4,6 @@
 支持异步工具调用、自动发现、动态注册
 """
 
-from code_agent.core.state import tracer
-
 import asyncio
 import importlib
 import json
@@ -19,7 +17,8 @@ from openai.types.chat import (
 )
 from pydantic import BaseModel, TypeAdapter
 
-from code_agent.core.exceptions import SystemException, ToolError
+from code_agent.core.exceptions import SystemError, ToolError
+from code_agent.core.state import tracer
 
 _logger = logging.getLogger(__name__)
 
@@ -150,7 +149,7 @@ def tools_for_gen_ai(tag: str) -> list[ChatCompletionFunctionToolParam]:
         raise ValueError(f"无效的标签: {tag}")
     tools = _tool_registry.get_tools_by_tag(tag)  # type: ignore
     if not tools:
-        raise SystemException(f"未注册标签 {tag} 的工具")
+        raise SystemError(f"未注册标签 {tag} 的工具")
     return [_build_tool_info(t) for t in tools]
 
 

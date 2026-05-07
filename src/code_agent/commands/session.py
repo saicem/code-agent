@@ -1,4 +1,4 @@
-from dependency_injector.wiring import Provide
+from dependency_injector.wiring import Provide, inject
 
 from code_agent.agent.session_manager import SessionManager
 from code_agent.core.container import Container
@@ -16,6 +16,7 @@ def _show_session_help() -> None:
 
 
 @tracer.start_as_current_span("handle_session_list")
+@inject
 def _handle_session_list(
     session_manager: SessionManager = Provide[Container.session_manager],
 ) -> None:
@@ -37,6 +38,7 @@ def _handle_session_list(
 
 
 @tracer.start_as_current_span("handle_session_switch")
+@inject
 def _handle_session_switch(
     session_id: str, session_manager: SessionManager = Provide[Container.session_manager]
 ) -> None:
@@ -49,6 +51,7 @@ def _handle_session_switch(
 
 
 @tracer.start_as_current_span("handle_session_new")
+@inject
 def _handle_session_new(
     session_manager: SessionManager = Provide[Container.session_manager],
 ) -> None:
@@ -58,6 +61,7 @@ def _handle_session_new(
 
 
 @tracer.start_as_current_span("handle_session_delete")
+@inject
 def _handle_session_delete(
     session_id: str,
     session_manager: SessionManager = Provide[Container.session_manager],

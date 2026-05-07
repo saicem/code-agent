@@ -29,7 +29,7 @@ class SessionError(CodeAgentError):
     message = "Session operation failed"
 
 
-class SystemException(CodeAgentError):
+class SystemError(CodeAgentError):
     """系统异常基类"""
 
     code = "SYSTEM_ERROR"

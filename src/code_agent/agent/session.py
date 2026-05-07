@@ -7,6 +7,7 @@
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Iterable
 
 from openai.types.chat import (
     ChatCompletionAssistantMessageParam,
@@ -61,7 +62,7 @@ class Session:
     def add_assistant_message(
         self,
         content: str,
-        tool_calls: list[ChatCompletionMessageToolCallUnionParam] | None = None,
+        tool_calls: Iterable[ChatCompletionMessageToolCallUnionParam] | None = None,
     ):
         message: ChatCompletionAssistantMessageParam = {
             "role": "assistant",
@@ -69,6 +70,12 @@ class Session:
         }
         if tool_calls:
             message["tool_calls"] = tool_calls
+        self.messages.append(message)
+        self.history.append(message)
+        self.updated_at = datetime.now().isoformat()
+
+    def add(self, message: ChatCompletionMessageParam):
+        """添加消息"""
         self.messages.append(message)
         self.history.append(message)
         self.updated_at = datetime.now().isoformat()
@@ -110,4 +117,3 @@ class Session:
 
     def clear_message(self) -> None:
         self.messages = []
-

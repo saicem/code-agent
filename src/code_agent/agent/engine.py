@@ -7,7 +7,10 @@ import logging
 import re
 
 from dependency_injector.wiring import Provide, inject
-from openai.types.chat import ChatCompletionMessageToolCallUnion
+from openai.types.chat import (
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionMessageToolCallUnion,
+)
 from opentelemetry import trace
 from opentelemetry.trace.status import StatusCode
 
@@ -58,11 +61,11 @@ async def _reasoning_acting(
             await _compress_session(session)
         response = await gate.call_model(session.messages, tools_for_gen_ai(tag))
         message = response.choices[0].message
+        session.add(ChatCompletionAssistantMessageParam(**message.model_dump()))
 
         # 处理助手消息
         if message.content is not None:
             _logger.info(f"助手响应内容长度: {len(message.content)} 字符")
-            session.add_assistant_message(message.content)
             tool_call_summary = _get_tool_summary(message.tool_calls) if message.tool_calls else ""
             print_model_output(message.content + tool_call_summary)
 

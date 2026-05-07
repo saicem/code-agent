@@ -2,7 +2,7 @@ from dependency_injector.wiring import Provide
 
 from code_agent.agent.session_manager import SessionManager
 from code_agent.core.container import Container
-from code_agent.core.state import current_session
+from code_agent.core.state import current_session, tracer
 from code_agent.utils import print_system_output
 
 
@@ -15,6 +15,7 @@ def _show_session_help() -> None:
     print_system_output("  /session info      - 显示当前会话信息", "info")
 
 
+@tracer.start_as_current_span("handle_session_list")
 def _handle_session_list(
     session_manager: SessionManager = Provide[Container.session_manager],
 ) -> None:
@@ -35,6 +36,7 @@ def _handle_session_list(
         print_system_output(f"       消息: {session['message_count']} 条", "info")
 
 
+@tracer.start_as_current_span("handle_session_switch")
 def _handle_session_switch(
     session_id: str, session_manager: SessionManager = Provide[Container.session_manager]
 ) -> None:
@@ -46,6 +48,7 @@ def _handle_session_switch(
         print_system_output(f"\n错误: 无法找到会话 {session_id}", "error")
 
 
+@tracer.start_as_current_span("handle_session_new")
 def _handle_session_new(
     session_manager: SessionManager = Provide[Container.session_manager],
 ) -> None:
@@ -54,6 +57,7 @@ def _handle_session_new(
     print_system_output(f"\n已创建新会话: {session.session_id}", "info")
 
 
+@tracer.start_as_current_span("handle_session_delete")
 def _handle_session_delete(
     session_id: str,
     session_manager: SessionManager = Provide[Container.session_manager],
@@ -68,6 +72,7 @@ def _handle_session_delete(
         print_system_output(f"\n错误: 无法找到会话 {session_id}", "error")
 
 
+@tracer.start_as_current_span("handle_session_info")
 def _handle_session_info() -> None:
     session = current_session.get()
     print_system_output("\n当前会话信息:", "info")
@@ -78,6 +83,7 @@ def _handle_session_info() -> None:
     print_system_output(f"  预估总Token数: {session.total_token}", "info")
 
 
+@tracer.start_as_current_span("handle_session")
 def _handle_session(command: str) -> None:
     cmd_parts = command.split(" ", 2)
     if len(cmd_parts) < 2:

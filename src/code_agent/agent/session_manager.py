@@ -7,6 +7,7 @@ from typing import Any
 from code_agent.agent.memory import MemoryManager
 from code_agent.agent.prompt import CODE_SYSTEM
 from code_agent.agent.session import Session
+from code_agent.core.state import tracer
 
 _logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class SessionManager:
         os.makedirs(sessions_dir, exist_ok=True)
         _logger.info("会话管理器初始化完成")
 
+    @tracer.start_as_current_span("create_session")
     def create_session(self) -> Session:
         """创建新会话
 
@@ -43,6 +45,7 @@ class SessionManager:
         self.save_session(session)
         return session
 
+    @tracer.start_as_current_span("save_session")
     def save_session(self, session: Session):
         """保存会话"""
         session_id = session.session_id
@@ -61,6 +64,7 @@ class SessionManager:
             _logger.error(f"保存会话 {session_id} 失败: {e}", exc_info=True)
             raise
 
+    @tracer.start_as_current_span("load_last_session")
     def load_last_session(self) -> Session | None:
         """加载上次会话
 
@@ -84,6 +88,7 @@ class SessionManager:
 
         return None
 
+    @tracer.start_as_current_span("load_session")
     def load_session(self, session_id: str) -> Session | None:
         """加载指定会话
 
@@ -110,6 +115,7 @@ class SessionManager:
             _logger.error(f"加载会话 {session_id} 失败: {e}", exc_info=True)
             return None
 
+    @tracer.start_as_current_span("delete_session")
     def delete_session(self, session_id: str) -> bool:
         """删除指定会话
 

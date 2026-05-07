@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 from code_agent.core.config import Config
+from code_agent.core.state import tracer
 from code_agent.utils import print_system_output
 from code_agent.utils.path_spec import DEFAULT_IGNORE_SPEC, get_pathspec_from_gitignore
 
@@ -41,6 +42,7 @@ class MemoryManager:
         self.auto_memory = config.storage.auto_memory
         self._file_ignore_spec = get_pathspec_from_gitignore(".gitignore") or DEFAULT_IGNORE_SPEC
 
+    @tracer.start_as_current_span("save_compressed_data")
     def save_compressed_data(self, auto_memory: str) -> None:
         """将用户偏好和项目情况持久化到文件"""
         if auto_memory:
@@ -51,6 +53,7 @@ class MemoryManager:
             except Exception as e:
                 _logger.error(f"保存记忆失败: {e}", exc_info=True)
 
+    @tracer.start_as_current_span("load_memory")
     def load_memory(self) -> str:
         """加载记忆文件，读取 project.md 和 preference.md 并以 XML 标签包含"""
         _logger.info("开始加载记忆文件")

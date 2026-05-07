@@ -77,10 +77,3 @@ class Config(BaseSettings):
     storage: StorageConfig = Field(default_factory=StorageConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     engine: EngineConfig = Field(default_factory=EngineConfig)
-
-
-_config = Config()
-
-
-def get_config() -> Config:
-    return _config

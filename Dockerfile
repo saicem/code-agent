@@ -23,4 +23,4 @@ ENTRYPOINT []
 ENV PYTHONPATH=/app/src
 ENV OTEL__ENABLED=true
 
-CMD ["uv", "run", "python", "src/code_agent/main.py"]
+CMD ["uv", "run", "agt"]

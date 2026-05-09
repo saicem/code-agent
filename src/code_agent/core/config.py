@@ -15,7 +15,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class GateConfig(BaseModel):
     """OpenAI API 配置"""
 
-    api_key: str = Field(default=..., description="OpenAI API 密钥")
+    api_key: str = Field(default="", description="OpenAI API 密钥")
     base_url: str | None = Field(default=None, description="OpenAI API 基础 URL")
     model: str = Field(default="gpt-4o-mini", description="模型名称")
 

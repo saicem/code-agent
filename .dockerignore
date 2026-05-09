@@ -4,9 +4,6 @@
 README.md
 AGENTS.md
 LICENSE
-pyproject.toml
-uv.lock
-uv.toml
 Dockerfile
 docker-compose.yml
 Makefile

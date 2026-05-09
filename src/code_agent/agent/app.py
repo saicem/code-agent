@@ -1,3 +1,4 @@
+from code_agent.core.config import Config
 import logging
 
 from dependency_injector.wiring import Provide, inject
@@ -45,7 +46,11 @@ async def handle_task(
     session_manager.save_session(session)
 
 
-async def start_agent():
+async def start_agent(config: Config = Provide[Container.config]):
+    """启动智能体"""
+    if not config.gate.api_key:
+        print_system_output("请配置 OpenAI API 密钥", "error")
+        return
     _logger.info("========== Code Agent 启动中 ==========")
     init_current_session()
     print_system_output("请输入任务描述，输入 '/quit' 退出，输入 '/help' 查看可用指令", "info")

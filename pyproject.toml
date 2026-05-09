@@ -18,7 +18,7 @@ dependencies = [
     "pathspec>=1.1.1",
     "dependency-injector>=4.49.0",
 ]
-scripts = { "apt" = "code_agent.main:main" }
+scripts = { "agt" = "code_agent.main:main" }
 
 
 [build-system]
